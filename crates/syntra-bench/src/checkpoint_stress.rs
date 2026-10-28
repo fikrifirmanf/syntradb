@@ -973,7 +973,14 @@ pub(super) fn run(cluster: &Cluster, options: &Options) -> Result<Value> {
                 missed: s.planned.saturating_sub(s.attempts),
             })
             .collect::<Vec<_>>();
-        crate::checkpoint_soak::evaluate(&windows, &service, wal_bytes, committed_writes)?
+        crate::checkpoint_soak::evaluate(&windows, &service, wal_bytes, committed_writes)
+            .inspect_err(|_| {
+                // A failed soak writes no report; keep each worker's latencies,
+                // including writer steps, in the run's output.
+                for report in reports.iter().map(Stats::report) {
+                    eprintln!("Checkpoint soak worker: {report}");
+                }
+            })?
     } else {
         Value::Null
     };
