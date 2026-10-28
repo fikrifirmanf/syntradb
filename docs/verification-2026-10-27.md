@@ -563,3 +563,11 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   cascading and failback check and the quorum check each passed twice with
   `numeric`. See
   [numeric columns](numeric-design.md).
+- **Linux build.** In an Ubuntu 24.04 arm64 container, a non-root user ran
+  `scripts/setup.sh` and `scripts/check.sh` against commit `afc0afb`. All 184
+  PostgreSQL tests passed. The first two attempts failed: `cargo-pgrx` needs
+  `libssl-dev`, which CI now installs, and clippy rejected seven `c_char`
+  casts that are no-ops on arm64 Linux, where `c_char` is unsigned. Those
+  casts now go through one helper. The CI workflow has not run, because the
+  repository has no remote, and x86_64 Linux is untested. The log is
+  `benchmarks/results/linux-arm64-check-2026-10-29.log`.
