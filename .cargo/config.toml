@@ -1,0 +1,7 @@
+[env]
+PGRX_HOME = { value = ".pgrx", relative = true }
+CARGO_PGRX = { value = ".tools/bin/cargo-pgrx", relative = true }
+
+[target.'cfg(target_os = "macos")']
+# PostgreSQL resolves extension symbols when loading the shared library.
+rustflags = ["-Clink-arg=-Wl,-undefined,dynamic_lookup"]

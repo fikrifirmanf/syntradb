@@ -1,0 +1,31 @@
+[workspace]
+members = ["crates/syntra-core", "crates/syntra-storage", "crates/syntra-exec", "crates/syntra-pg", "crates/syntra-bench"]
+default-members = ["crates/syntra-core", "crates/syntra-storage", "crates/syntra-exec"]
+resolver = "2"
+
+[workspace.package]
+version = "0.4.0"
+edition = "2021"
+rust-version = "1.99"
+publish = false
+
+[workspace.dependencies]
+syntra-core = { path = "crates/syntra-core" }
+syntra-storage = { path = "crates/syntra-storage" }
+syntra-exec = { path = "crates/syntra-exec" }
+crc32fast = "=1.5.3"
+pgrx = "=0.19.3"
+pgrx-tests = "=0.19.3"
+postgres = { version = "=0.19.14", features = ["with-serde_json-1"] }
+serde_json = "=1.0.154"
+tempfile = "=3.27.0"
+hdrhistogram = { version = "=7.6.0", default-features = false }
+sha2 = "=0.11.1"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[profile.release]
+panic = "unwind"
+lto = "thin"
+codegen-units = 1

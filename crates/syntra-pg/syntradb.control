@@ -1,0 +1,7 @@
+comment = 'SyntraDB experimental Rust HTAP foundation'
+default_version = '@CARGO_VERSION@'
+module_pathname = '$libdir/syntradb'
+relocatable = false
+schema = 'public'
+superuser = true
+trusted = false

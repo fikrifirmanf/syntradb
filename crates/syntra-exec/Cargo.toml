@@ -1,0 +1,13 @@
+[package]
+name = "syntra-exec"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+syntra-core.workspace = true
+syntra-storage.workspace = true
+
+[lints]
+workspace = true

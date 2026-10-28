@@ -1,0 +1,30 @@
+[package]
+name = "syntra-pg"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+name = "syntradb"
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = ["pg18"]
+pg18 = ["pgrx/pg18", "pgrx-tests/pg18"]
+pg_test = []
+
+[dependencies]
+pgrx.workspace = true
+syntra-core.workspace = true
+syntra-exec.workspace = true
+syntra-storage.workspace = true
+
+[dev-dependencies]
+pgrx-tests.workspace = true
+
+[build-dependencies]
+sha2.workspace = true
+
+[lints]
+workspace = true

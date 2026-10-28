@@ -1,0 +1,18 @@
+name: Rust and PostgreSQL
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libicu-dev libreadline-dev zlib1g-dev libclang-dev clang bison flex
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Build project-local PostgreSQL and pgrx
+        run: bash scripts/setup.sh
+      - name: Check Rust and PostgreSQL integration
+        run: bash scripts/check.sh
