@@ -312,7 +312,7 @@ pub(super) fn validate_column(
             );
         }
         let catalog = &*relation.rd_rel;
-        if catalog.relkind as u8 != pg_sys::RELKIND_RELATION
+        if crate::catalog_char(catalog.relkind) != pg_sys::RELKIND_RELATION
             || catalog.relam != pg_sys::HEAP_TABLE_AM_OID
             || catalog.relispartition
             || catalog.relhassubclass

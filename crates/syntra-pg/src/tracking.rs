@@ -69,7 +69,7 @@ fn syntra_track_source(source: PgRelation, column: &str) -> i64 {
     );
     // SAFETY: locked relation descriptor is live; inheritance lookup is catalog-only.
     unsafe {
-        if (*locked.rd_rel).relpersistence as u8 != pg_sys::RELPERSISTENCE_PERMANENT
+        if crate::catalog_char((*locked.rd_rel).relpersistence) != pg_sys::RELPERSISTENCE_PERMANENT
             || pg_sys::has_superclass(locked.oid())
         {
             pgrx::ereport!(

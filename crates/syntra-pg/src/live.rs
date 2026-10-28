@@ -12,7 +12,7 @@ struct Version {
 fn trackable(source: &PgRelation) -> bool {
     // SAFETY: caller holds the validated source's transaction-level read lock.
     unsafe {
-        (*source.rd_rel).relpersistence as u8 == pg_sys::RELPERSISTENCE_PERMANENT
+        crate::catalog_char((*source.rd_rel).relpersistence) == pg_sys::RELPERSISTENCE_PERMANENT
             && !(*source.rd_rel).relhasrules
             && !pg_sys::has_superclass(source.oid())
             && !matches!(source.namespace(), "syntra" | "pg_catalog" | "pg_toast")

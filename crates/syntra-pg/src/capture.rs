@@ -36,7 +36,7 @@ fn trigger_valid(source: &PgRelation, oid: pg_sys::Oid, procedure: pg_sys::Oid, 
             t.tgoid == oid
                 && t.tgfoid == procedure
                 && t.tgtype == kind
-                && t.tgenabled as u8 == b'A'
+                && crate::catalog_char(t.tgenabled) == b'A'
                 && !t.tgisinternal
                 && !t.tgisclone
                 && t.tgnargs == 0
@@ -203,7 +203,7 @@ fn syntra_seed_capture(
     );
     // SAFETY: source exclusive lock protects all relation flags.
     if unsafe {
-        (*source.rd_rel).relpersistence as u8 != pg_sys::RELPERSISTENCE_PERMANENT
+        crate::catalog_char((*source.rd_rel).relpersistence) != pg_sys::RELPERSISTENCE_PERMANENT
             || (*source.rd_rel).relhasrules
             || pg_sys::has_superclass(source.oid())
     } || matches!(source.namespace(), "syntra" | "pg_catalog" | "pg_toast")
@@ -632,7 +632,8 @@ pub(super) fn current_configuration(
             || (*source.rd_rel).relhasrules
             || (*source.rd_rel).relhassubclass
             || (*source.rd_rel).relispartition
-            || (*source.rd_rel).relpersistence as u8 != pg_sys::RELPERSISTENCE_PERMANENT
+            || crate::catalog_char((*source.rd_rel).relpersistence)
+                != pg_sys::RELPERSISTENCE_PERMANENT
             || pg_sys::has_superclass(source.oid())
     } {
         return Err("capture_unavailable");

@@ -433,7 +433,7 @@ pub(super) fn guards_current(source: &PgRelation, trigger: pg_sys::Oid) -> bool 
             t.tgoid == trigger
                 && t.tgfoid == procedure
                 && t.tgtype == 60
-                && t.tgenabled as u8 == b'A'
+                && crate::catalog_char(t.tgenabled) == b'A'
                 && !t.tgisinternal
                 && !t.tgisclone
                 && t.tgnargs == 0

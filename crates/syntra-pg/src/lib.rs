@@ -10,6 +10,13 @@ pub(crate) trait Column:
 impl Column for i32 {}
 impl Column for i64 {}
 
+/// A catalog `char` field as a byte. `c_char` is `u8` on aarch64 Linux and `i8`
+/// on x86_64 and macOS, so this cast is a no-op on some targets.
+#[allow(clippy::unnecessary_cast)]
+pub(crate) fn catalog_char(c: std::ffi::c_char) -> u8 {
+    c as u8
+}
+
 /// The stored width of a capture column whose catalog width is `width`. An int2
 /// column (catalog width 2) is stored at 4 bytes, so it uses the int4 encodings.
 pub(crate) fn stored_width(width: i16) -> i16 {
