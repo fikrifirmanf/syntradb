@@ -569,7 +569,11 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   `libssl-dev`, which CI now installs, and clippy rejected seven `c_char`
   casts that are no-ops on arm64 Linux, where `c_char` is unsigned. Those
   casts now go through one helper. The CI workflow has not run, because the
-  repository has no remote, and x86_64 Linux is untested. The log is
+  repository has no remote. The same check then passed at `52fa5ed` in an
+  x86_64 Ubuntu 24.04 container, emulated by Docker Desktop on the arm64 Mac,
+  with all 184 PostgreSQL tests
+  (`benchmarks/results/linux-x86_64-emulated-check-2026-10-29.log`). It has
+  not run on x86_64 hardware. The log is
   `benchmarks/results/linux-arm64-check-2026-10-29.log`.
 - **Resealed decoder edits.** `crates/syntra-storage/tests/resealed_mutations.rs`
   makes 20,000 seeded edits of one to four bytes to each checkpoint, delta and

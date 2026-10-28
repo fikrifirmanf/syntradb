@@ -8,7 +8,8 @@ hardware before relying on it.
 ## Before enabling capture
 
 - Run `bash scripts/check.sh` on the build you install. It has passed on macOS
-  arm64 and on Ubuntu 24.04 arm64. x86_64 Linux is untested.
+  arm64, and on Ubuntu 24.04 arm64 and x86_64. The x86_64 run was emulated on
+  an arm64 Mac, not run on x86_64 hardware.
 - Capture accepts permanent heap tables with one int2, int4 or int8 primary key
   and one int2, int4, int8 or `numeric(p,s)` value column, with p ≤ 18. See
   [transactional capture](transactional-capture.md) for the full list of
