@@ -556,7 +556,7 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   conversion bugs failed them. The upgrade checks pass with 504 catalog
   entries, and the downgrade refuses while a `numeric` feed exists. The
   physical restore check passed at 1, 16 and 64 writers and the standby check
-  twice with `numeric(12,2)`. Five of six 20-minute `numeric(18,2)` soaks
+  twice with `numeric(12,2)`. Eight of nine 20-minute `numeric(18,2)` soaks
   passed; the first stopped with an unrecorded pruner error, and the harness
   now keeps the error details and server log. Writer tail latency varied
   between runs; the runs do not show a `numeric` cost. The synchronous,
