@@ -141,7 +141,7 @@ monitor that skips the merge fails the stress run.
 
 ### numeric, 2026-10-28
 
-Nine 20-minute `numeric(18,2)` soaks on 0.4.0, same settings, and two `int4`
+Thirteen 20-minute `numeric(18,2)` soaks on 0.4.0, same settings, and two `int4`
 soaks run between two of them for comparison:
 
 | Run | Result | Writer missed arrivals | Writer p50 / p99 | Worst 60 s window |
@@ -157,6 +157,10 @@ soaks run between two of them for comparison:
 | `checkpoint-soak-20min-numeric-040-r6` (2026-10-29) | passed | 28 and 29 | 2.6 / 13.7 ms | 1,611 |
 | `checkpoint-soak-20min-numeric-040-r7` (2026-10-29) | passed | 0 and 0 | 2.6 / 11.4 ms | 1,636 |
 | `checkpoint-soak-20min-numeric-040-r8` (2026-10-29) | passed | 0 and 0 | 2.6 / 11.3 ms | 1,636 |
+| `checkpoint-soak-20min-numeric-040-r9` (2026-10-29) | passed | 0 and 0 | 2.6 / 12.4 ms | 1,635 |
+| `checkpoint-soak-20min-numeric-040-r10` (2026-10-29) | passed | 0 and 0 | 2.6 / 11.3 ms | 1,635 |
+| `checkpoint-soak-20min-numeric-040-r11` (2026-10-29) | passed | 0 and 0 | 2.6 / 11.2 ms | 1,635 |
+| `checkpoint-soak-20min-numeric-040-r12` (2026-10-29) | passed | 0 and 0 | 2.6 / 11.3 ms | 1,635 |
 
 The passing runs had no unexpected errors and no invariant failures, with
 35,523 to 36,000 keyed checks each. Those that slowed did so while the old
@@ -169,8 +173,8 @@ is not known. The harness then printed only the first failing worker in join
 order, without PostgreSQL's code or message, and removed the server log with the
 cluster. It now prints every worker's error with SQLSTATE, message and detail,
 and the last 60 lines of the server log on failure; a forced failure showed both.
-None of the ten later runs reproduced the error, including three `numeric`
-runs made only to catch it with the new diagnostics. One failure in eleven runs
+None of the fourteen later runs reproduced the error, including seven `numeric`
+runs made only to catch it with the new diagnostics. One failure in fifteen runs
 with no recorded cause is open, not resolved.
 
 In the first four passing `numeric` runs, writers missed 367 to 703 arrivals
@@ -178,7 +182,7 @@ with a p99 of 38 to 54 ms, against 8 to 15 and 13 to 14 ms for the two `int4`
 runs. The dips came in minutes 8 to 10, when the held snapshot had left 100,000
 to 130,000 dead rows in the source. The sixth `numeric` run reached the same
 131,092 dead rows with no dip: 8 and 11 missed arrivals, a 17.8 ms p99. Of the
-three runs on 2026-10-29 after it, two missed no arrivals and one missed 28 and
+seven runs on 2026-10-29 after it, six missed no arrivals and one missed 28 and
 29, with p99s of 11 to 14 ms. These runs do not show that `numeric` costs more; like the 0.4.0 `int4` pairs above,
 the soak varies from run to run on this laptop for reasons not identified.
 

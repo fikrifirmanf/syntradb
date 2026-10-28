@@ -64,7 +64,7 @@ The synchronous, cascading and failback check and the quorum check each passed
 twice with a `numeric(12,2)` feed
 ([recovery](recovery.md#synchronous-standby-cascading-standby-and-failback)).
 
-Eight of nine 20-minute soaks with a `numeric(18,2)` feed passed; the first
+Twelve of thirteen 20-minute soaks with a `numeric(18,2)` feed passed; the first
 stopped with a pruner error whose cause was not recorded. Writer tail latency
 varied from run to run as it does for `int4`
 ([checkpoint soak](checkpoint-soak.md#numeric-2026-10-28)).
