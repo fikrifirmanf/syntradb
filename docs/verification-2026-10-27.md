@@ -571,3 +571,10 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   casts now go through one helper. The CI workflow has not run, because the
   repository has no remote, and x86_64 Linux is untested. The log is
   `benchmarks/results/linux-arm64-check-2026-10-29.log`.
+- **Resealed decoder edits.** `crates/syntra-storage/tests/resealed_mutations.rs`
+  makes 20,000 seeded edits of one to four bytes to each checkpoint, delta and
+  manifest fixture, then rewrites the CRC so the parser sees the damage. Each
+  decoder must refuse the bytes or accept only bytes it encodes back exactly.
+  All six fixtures passed, with 8,026 to 15,547 of each 20,000 refused. Letting
+  the delta decoder accept a nonzero value under an absent or NULL tag failed
+  the test. Segments are not covered; they keep their own arbitrary-bytes test.
