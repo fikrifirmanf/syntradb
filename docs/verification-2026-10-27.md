@@ -582,3 +582,8 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   All six fixtures passed, with 8,026 to 15,547 of each 20,000 refused. Letting
   the delta decoder accept a nonzero value under an absent or NULL tag failed
   the test. Segments are not covered; they keep their own arbitrary-bytes test.
+- **Two-hour soak.** An `int4` soak held an old snapshot for 60 minutes and
+  failed the missed-arrival limit. Writers kept full speed to a horizon age
+  near 89,000 and fell to a fifth of it by 188,000. No worker failed, the held
+  snapshot read back correctly, and every worker recovered within a minute of
+  release. See [the soak](checkpoint-soak.md#two-hour-hold-int4-2026-10-29).

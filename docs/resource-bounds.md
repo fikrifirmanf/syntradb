@@ -255,6 +255,10 @@ pruner's mark delete; see the
 [measured fixes](../benchmarks/checkpoint-soak-2026-10-27.md#fixes-measured-2026-10-28).
 On 0.2.0 the 20-minute soak held full writer speed to an age of 42,872 at 30
 cycles per second, and the 60-cycle diagnostics slowed only above about 41,000
-with readers running. Storage still grows while a snapshot is held, and these are
-one laptop's numbers, so keep the policy. Raise the thresholds only after a
+with readers running. On 0.4.0 a two-hour soak held the snapshot for an hour:
+writers kept full speed to an age near 89,000, then fell to a fifth of it by
+188,000, and recovered within a minute of release
+([two-hour hold](checkpoint-soak.md#two-hour-hold-int4-2026-10-29)). A snapshot
+left open long enough still stops writers in practice. Storage still grows while
+a snapshot is held, and these are one laptop's numbers, so keep the policy. Raise the thresholds only after a
 held-snapshot soak passes on the pilot's hardware.

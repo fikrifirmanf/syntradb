@@ -198,6 +198,39 @@ failed`. The same off-by-one in the harness's own conversion of min, which only
 the repeatable-read comparison uses, passed: the checks compare the extension
 with PostgreSQL inside SQL, not the harness's copy of min and max.
 
+### Two-hour hold, int4, 2026-10-29
+
+One 7,200-second `int4` soak on 0.4.0, otherwise at the default settings,
+holds the old snapshot for 60 minutes instead of 10
+(`benchmarks/results/checkpoint-soak-2h-int4-040-2026-10-29.log`). It failed
+the missed-arrival limit. No worker failed, and the retained snapshot still
+read back correctly before its release. Run once; the cause of the slowdown is
+not identified.
+
+| Minute | Horizon age | Writes per writer per minute | Dead source rows | Database |
+|---|---|---|---|---|
+| 1 | 4,516 | 1,637 | 13,226 | 24 MB |
+| 21 | 88,918 | 1,635 | 275,052 | 230 MB |
+| 30 | 127,244 | 1,146 | 374,313 | 348 MB |
+| 45 | 171,516 | 449 | 469,500 | 519 MB |
+| 60 | 188,455 | 328 | 512,920 | 584 MB |
+| 61 (released) | 2 | 1,618 | 7,354 | 584 MB |
+| 120 | 0 | 1,637 | 5,732 | 145 MB |
+
+Writers held the offered 1,636 writes a minute for the first 21 minutes, to a
+horizon age near 89,000, then fell steadily to a fifth of it. The
+repeatable-read reader and the keyed monitor slowed later, and the pruner
+committed 7 times in the last held minute against about 1,500 before. All of
+them returned to full rate in the first minute after release, and stayed there
+for the remaining hour. At minute 60 the manifest catalog held 188 MB and the
+chunk catalog 117 MB, on a cluster with the default 128 MB `shared_buffers`.
+The slowdown began once the database outgrew that, but this run does not show
+that the size is the cause.
+
+The database shrank from 584 MB to 145 MB after release. Each writer backend's
+RSS rose from 30 MB to 151 MB and stayed there; it includes touched shared
+buffers.
+
 ## Scope
 
 One host, one database, one captured source, and catalogs that fit in memory.
