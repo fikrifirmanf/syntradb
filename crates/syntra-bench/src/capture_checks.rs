@@ -178,6 +178,18 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         "capture did not preserve key move, insert and delete",
     )?;
     writer.batch_execute("BEGIN; UPDATE capture_check SET v=51 WHERE id=5")?;
+    // The row trigger is deferred: the change has no event until it fires.
+    let queued: i64 = writer
+        .query_one(
+            "SELECT count(*) FROM syntra.capture_events WHERE source_relation='capture_check'::regclass",
+            &[],
+        )?
+        .try_get(0)?;
+    require(
+        queued == 4,
+        "deferred capture wrote an event before it fired",
+    )?;
+    writer.batch_execute("SET CONSTRAINTS ALL IMMEDIATE")?;
     require(
         verify(&mut writer)? == 5,
         "capture missed own uncommitted change",
@@ -281,8 +293,9 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     )?;
     writer.batch_execute("ALTER TABLE capture_check DISABLE TRIGGER _syntra_capture_row; UPDATE capture_check SET v=53 WHERE id=5; ALTER TABLE capture_check ENABLE ALWAYS TRIGGER _syntra_capture_row")?;
     writer.batch_execute("COMMIT")?;
+    // The deferred row trigger raises the rejection at commit.
     let rejected = reader
-        .execute("UPDATE capture_check SET v=54 WHERE id=3", &[])
+        .batch_execute("UPDATE capture_check SET v=54 WHERE id=3; COMMIT")
         .err()
         .ok_or("old-snapshot capture accepted a DDL gap")?;
     require(
@@ -335,7 +348,7 @@ pub(super) fn recovery(cluster: &mut Cluster) -> Result<Value> {
         "capture committed prefix setup failed",
     )?;
     writer.batch_execute(
-        "BEGIN; UPDATE capture_check SET v=12 WHERE id=1; DELETE FROM capture_check WHERE id=4",
+        "BEGIN; SET CONSTRAINTS ALL IMMEDIATE; UPDATE capture_check SET v=12 WHERE id=1; DELETE FROM capture_check WHERE id=4",
     )?;
     require(
         verify(&mut writer)? == 4,

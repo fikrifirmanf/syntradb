@@ -183,3 +183,28 @@ and marks. Once the summed hold time nears one second per second the queue
 grows and writers miss their arrivals. Faster lookups would move the point;
 only a shorter hold, or no shared lock, would remove the queue. One laptop and
 one run of each.
+
+## 0.6.0: the head lock taken at commit
+
+0.6.0 fires the capture row trigger at commit (see
+[upgrades](../docs/upgrades.md#050-to-060)), so a captured transaction holds
+the head-row lock only from commit-time capture to commit. The cycle control
+was rerun on it (`hold-control.sh 40 30 55 cycle`,
+`benchmarks/results/hold-control-cycle-int4-060-2026-10-29.log`).
+
+| Round | Horizon age | Plain ms | Captured ms (0.6.0) | Captured ms (0.5.0, age) |
+|---|---|---|---|---|
+| 5 | 18,000–20,000 | 4.9 | 6.6 | 9.0 (20,000) |
+| 10 | 38,000–40,000 | 6.6 | 8.0 | 11.8 (40,000) |
+| 33 | ~113,000 | 13 | 11 | 12.1 (120,000, round 30) |
+| 36 | 122,000–124,000 | 20.8 | 10.9 | 45.9 (143,000) |
+| 40 | 138,000–140,000 | 13.3 | 392.5 | 39.5 (159,000) |
+
+From round 14 to round 32 (about 16:59 to 17:09) both tables, plain included,
+ran at 0.2 to 14 s per transaction. The power log shows other applications
+active on the laptop then, and the 15-minute load average stood at 45 shortly
+after. That window measures the machine, not SyntraDB, and the run cannot
+settle whether the late captured rise moved. Outside it, the captured table
+stayed within about 1.5 ms of plain to round 39, and round 40 rose to 392 ms.
+No transaction failed and both sums matched. A rerun on an idle machine is
+needed.

@@ -116,7 +116,10 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         (1, 1, Some(-9), Some(-9), Some(-9)),
     )?;
     reset(&mut writer)?;
-    writer.batch_execute("UPDATE tail_check SET v=11 WHERE id=7; UPDATE syntra.capture_events SET before_value=999 WHERE source_relation='tail_check'::regclass AND ordinal=1")?;
+    // Commit the write first: its event is written only when the deferred
+    // capture trigger fires at commit.
+    writer.batch_execute("UPDATE tail_check SET v=11 WHERE id=7")?;
+    writer.batch_execute("UPDATE syntra.capture_events SET before_value=999 WHERE source_relation='tail_check'::regclass AND ordinal=1")?;
     read(
         &mut reader,
         "heap",
