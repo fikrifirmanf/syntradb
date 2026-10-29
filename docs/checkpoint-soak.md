@@ -263,6 +263,43 @@ which runs writers and the maintenance worker but no readers, held captured
 writes near 4 ms to an age of 500,000 on 0.5.0. Removing the counter rows
 therefore did not remove the soak slowdown; its remaining cause is not known.
 
+### Two-hour hold on 0.6.0, int4, 2026-10-29 (disturbed)
+
+The first attempt on 0.6.0 stopped in the bench's setup checks, which still
+expected the capture events of a transaction's own changes before commit
+(`...-060-2026-10-29.FAILED-base-and-changes-disagree.log`). With those checks
+adapted, the soak ran its full two hours and failed the missed-arrival limit
+(`benchmarks/results/checkpoint-soak-2h-int4-060-2026-10-29.FAILED-missed-arrivals-disturbed.log`).
+Each writer missed about 28,000 of 216,000 offered arrivals (13%), the
+repeatable-read reader 49,538, the keyed monitor 43,573 and each applier about
+31,000. No worker failed, no invariant failed, the held snapshot verified, and
+every worker returned to full rate after release.
+
+The run does not measure 0.6.0 alone. A load log taken beside it
+(`...FAILED-missed-arrivals-disturbed.load.txt`) shows a load average of 100 to
+295 from about minute 8 to minute 28, from other work on the laptop, against
+3 to 11 before and after. During that window the readers fell further behind
+than the writers. From minute 30 the machine was quiet:
+
+| Minute | Horizon age | Writes per writer per minute | Pruner commits | Database |
+|---|---|---|---|---|
+| 6 | 27,131 | 1,635 | 1,335 | 85 MB |
+| 15 (loaded) | 58,365 | 861 | 161 | 200 MB |
+| 30 | 111,973 | 1,586 | 67 | 386 MB |
+| 33 | 126,617 | 1,626 | 77 | 439 MB |
+| 36 | 140,030 | 1,521 | 10 | 486 MB |
+| 45 | 169,071 | 1,151 | 4 | 557 MB |
+| 60 | 204,925 | 841 | 9 | 646 MB |
+| 61 (released) | 3 | 1,628 | 1,490 | 515 MB |
+
+On the quiet machine, writers held near full rate to an age of about 127,000,
+where 0.5.0 had fallen to 798 a minute, and then slowed steadily to 841 a
+minute at 205,000. Taking the head lock at commit therefore appears to move
+the slowdown, not remove it. The appliers fell from about 600 to under 130
+commits a minute as the writers slowed, and the pruner had nearly stopped
+by minute 36. One disturbed run; an undisturbed rerun is needed before
+comparing versions.
+
 ## Scope
 
 One host, one database, one captured source, and catalogs that fit in memory.

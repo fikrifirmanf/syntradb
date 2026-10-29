@@ -616,3 +616,11 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   update that replaced a disabled trigger, one that left the bindings stale,
   one run with the DDL guards active, and a downgrade that skipped the swap. See
   [upgrades](upgrades.md#050-to-060).
+- **0.6.0 soak.** The bench setup checks, which run only inside the soak,
+  still expected statement-time events and failed the first two-hour attempt;
+  they were adapted (`703b611`). The second attempt failed the missed-arrival
+  limit with no invariant failure, but other load disturbed it for 20 minutes.
+  On the quiet part, writers held near full rate to a horizon age of about
+  127,000 and then slowed. See
+  [the soak](checkpoint-soak.md#two-hour-hold-on-060-int4-2026-10-29-disturbed).
+  The cycle hold control on 0.6.0 was disturbed the same way.
