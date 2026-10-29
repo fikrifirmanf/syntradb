@@ -300,6 +300,40 @@ commits a minute as the writers slowed, and the pruner had nearly stopped
 by minute 36. One disturbed run; an undisturbed rerun is needed before
 comparing versions.
 
+### Two-hour hold on 0.6.0, int4, quiet rerun, 2026-10-29
+
+Rerun from 20:25 with the load log beside it; the 1-minute load average
+peaked at 17.8 and was mostly near 3
+(`benchmarks/results/checkpoint-soak-2h-int4-060-run2-2026-10-29.FAILED-missed-arrivals.log`
+and `.load.txt`). It failed the missed-arrival limit. Each writer missed about
+24,000 of 216,000 offered arrivals (11%, against 19% on 0.5.0), the
+repeatable-read reader 40,293, the keyed monitor 24,543 and each applier about
+23,000. No worker failed, no invariant failed, the held snapshot verified, and
+every worker returned to full rate after release.
+
+| Minute | Horizon age | Writes per writer per minute | Apply commits (both) | Pruner commits | Database |
+|---|---|---|---|---|---|
+| 15 | 64,195 | 1,636 | 471 | 1,468 | 165 MB |
+| 21 | 91,523 | 1,634 | 888 | 1,027 | 242 MB |
+| 25 | 111,675 | 1,595 | 1,243 | 353 | 317 MB |
+| 30 | 134,087 | 1,334 | 980 | 39 | 402 MB |
+| 45 | 180,716 | 944 | 177 | 8 | 556 MB |
+| 60 | 210,336 | 746 | 143 | 17 | 626 MB |
+| 61 (released) | 3 | 1,617 | 494 | 1,386 | 628 MB |
+
+Writers held full rate to an age of about 110,000 and wrote 1,334 a minute at
+134,000; 0.5.0 had slowed from about 96,000 and wrote 798 at 125,000. They fell
+to 944 at 180,000, where 0.5.0 wrote 510. The
+pruner failed first. It kept to its schedule, missing 268 arrivals, but
+94,053 of its 215,732 attempts were refused because the maintenance lock was
+busy: the appliers held it for longer as the hold aged, and from minute 30 the
+pruner committed almost nothing. History the pruner cannot fold stays in the
+event and mark tables that each writer reads, so writers slowed after it. The
+[quiet cycle control](../benchmarks/held-snapshot-writers-2026-10-29.md#rerun-on-a-quiet-machine),
+which has no appliers competing with the worker, kept captured writes level with
+plain to 159,000. The remaining slowdown therefore lies in apply time under
+an old snapshot, not in the writer's own path. One run.
+
 ## Scope
 
 One host, one database, one captured source, and catalogs that fit in memory.

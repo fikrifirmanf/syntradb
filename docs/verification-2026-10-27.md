@@ -624,3 +624,10 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   127,000 and then slowed. See
   [the soak](checkpoint-soak.md#two-hour-hold-on-060-int4-2026-10-29-disturbed).
   The cycle hold control on 0.6.0 was disturbed the same way.
+- **0.6.0 quiet reruns.** The cycle hold control kept captured writes within
+  0.8 ms of plain from round 20 to a horizon age of 159,000. The quiet two-hour
+  soak still failed the missed-arrival limit (writers 11%, against 19% on
+  0.5.0) with no invariant failure. Writers held full rate to about 110,000;
+  the pruner was then refused the busy maintenance lock on 94,053 of 215,732
+  attempts, and writers slowed after it. See
+  [the soak](checkpoint-soak.md#two-hour-hold-on-060-int4-quiet-rerun-2026-10-29).
