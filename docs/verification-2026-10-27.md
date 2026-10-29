@@ -587,3 +587,9 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   near 89,000 and fell to a fifth of it by 188,000. No worker failed, the held
   snapshot read back correctly, and every worker recovered within a minute of
   release. See [the soak](checkpoint-soak.md#two-hour-hold-int4-2026-10-29).
+- **Held-snapshot control.** Under one held snapshot, a plain table kept 3.5 ms
+  transfers to 480,000 dead rows while an identical captured table reached
+  2.4 s. Adding versions to the 16 statement-tracking counter rows alone raised
+  a captured update from 0.4 to 6.3 ms at 80,000 versions each; adding them to
+  the head row did not. See
+  [the findings](../benchmarks/held-snapshot-writers-2026-10-29.md).
