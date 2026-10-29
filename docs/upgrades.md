@@ -327,6 +327,53 @@ seconds. It runs the downgrade while that writer is open, then checks that:
 - the catalog matches a fresh 0.5.0 install, and after a second update the
   trigger is deferred again and the catalog matches a fresh 0.6.0 install.
 
+## 0.6.0 to 0.7.0
+
+0.7.0 stores each partition's delta as its own row of
+`syntra.capture_chunk_deltas`, keyed by source, epoch, partition and revision.
+0.6.0 updated the partition's chunk row on every apply. With a snapshot held,
+each update left a version of that row, which every later apply walked twice:
+once to find the row and once in the unique check of its new index entry. On
+0.6.0 the delta update took nearly all of an applier's time late in a long hold,
+and pruning, which waits for the same maintenance lock, stalled behind it
+([findings](../benchmarks/held-snapshot-writers-2026-10-29.md#060-what-slows-the-soak-now)).
+An apply now inserts the new delta row and deletes the one it replaces by its
+physical position; the chunk row is written only when a fold rewrites the base.
+The manifest, chunk, delta and event formats are unchanged.
+
+The update only creates the table. Chunk rows keep the inline deltas 0.6.0
+stored, and 0.7.0 reads them as 0.6.0 did. The next apply that changes such a
+partition moves its delta to a row of its own and puts the chunk row back at its
+base revision; a fold rewrites it as a base.
+
+Install the library, restart, then run `ALTER EXTENSION syntradb UPDATE`.
+Between the restart and the update, writes are captured, reads replay the inline
+deltas, and dropping tables works. An apply that would append a delta fails
+with `relation "syntra.capture_chunk_deltas" does not exist` and publishes
+nothing, so the maintenance worker logs that error for each source until the
+update. The update takes no lock on sources, and a write sent while it is open
+is captured at once.
+
+## 0.7.0 to 0.6.0 (downgrade)
+
+With the 0.7.0 library still installed, run `ALTER EXTENSION syntradb UPDATE TO
+'0.6.0'`, then install the 0.6.0 library and restart. The script takes the
+maintenance lock, so it waits for a running apply or prune; moves each
+partition's newest delta row back into its chunk row; and drops the table. Event
+triggers are off for the script's own duration, because the 0.7.0 drop guard
+would read the table it drops.
+
+`scripts/downgrade-0.7.0-check.sh` appends deltas twice over the same
+partitions on 0.7.0, leaves history pending, and starts an apply that holds the
+maintenance lock for three seconds. It runs the downgrade while that apply is
+open, then checks that:
+
+- the downgrade waited for the apply, and every appended delta is inline;
+- the 0.7.0 library and then the 0.6.0 library read the pending history exactly,
+  and 0.6.0 applies it to a checkpoint that matches the heap;
+- the catalog matches a fresh 0.6.0 install, and after a second update a fresh
+  0.7.0 install, and applies append deltas again.
+
 ## Upgrade check
 
 ```sh
@@ -335,6 +382,7 @@ bash scripts/upgrade-check.sh 0.2.0    # from 0.2.0
 bash scripts/upgrade-check.sh 0.3.0    # from 0.3.0
 bash scripts/upgrade-check.sh 0.4.0    # from 0.4.0
 bash scripts/upgrade-check.sh 0.5.0    # from 0.5.0
+bash scripts/upgrade-check.sh 0.6.0    # from 0.6.0
 ```
 
 The check builds the archived source
@@ -350,7 +398,10 @@ swaps in the new library and checks that:
 - a write sent while the update transaction is open waits at least a second for
   the update, which holds each captured source's lock to commit while it
   replaces the row trigger, and is then captured; from 0.1.0 it may instead fail
-  closed;
+  closed; from 0.6.0, where the update replaces no trigger, it is captured in
+  under a second;
+- from 0.6.0, an apply before the update fails and publishes nothing, and after
+  the drain the replaced deltas have rows of their own;
 - from 0.5.0, a feed whose row trigger was disabled keeps the disabled trigger
   and maintenance on it fails, and every other feed's row trigger is the
   deferred one;

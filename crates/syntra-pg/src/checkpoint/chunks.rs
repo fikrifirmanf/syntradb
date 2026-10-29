@@ -7,10 +7,25 @@ use syntra_storage::chunks::{
     chunk_binding, digest, partition_of, ChunkRef, DeltaRef, Manifest, PARTITIONS,
 };
 use syntra_storage::delta::{encoded_delta_len, Delta};
+/// Where a partition's delta is stored.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Stored {
+    /// No delta: the chunk row holds the base at the manifest revision.
+    Base,
+    /// The chunk row holds the base and its delta at the manifest revision, as
+    /// 0.6.0 and earlier wrote it.
+    Inline,
+    /// The chunk row holds the base at its base revision, and the delta is a row
+    /// of `capture_chunk_deltas` at the manifest revision.
+    Appended,
+}
 /// A partition's stored bytes. `state` and `segment` are its base; `delta`, when
 /// the manifest records one, is fetched whenever either of them is.
 pub(super) struct Chunk {
     index: usize,
+    stored: Stored,
+    /// The appended delta row's position, when `stored` is `Appended`.
+    delta_row: Option<String>,
     state: Option<Vec<u8>>,
     segment: Option<Vec<u8>>,
     delta: Option<Vec<u8>>,
@@ -46,7 +61,7 @@ fn visit<K: Column, V: Column>(
     for counter in [&PASS_CHUNKS, &PASS_BYTES, &PASS_PEAK] {
         counter.store(0, Ordering::Relaxed);
     }
-    let keys = |index: usize| {
+    let keys = |index: usize, revision: u64| {
         [
             oid_key(1, "source_relation", source.oid()),
             int8_key(
@@ -56,12 +71,7 @@ fn visit<K: Column, V: Column>(
                 Int8Comparison::Equal,
             ),
             int2_key(3, "partition", index as i16),
-            int8_key(
-                4,
-                "revision",
-                manifest.chunks[index].revision as i64,
-                Int8Comparison::Equal,
-            ),
+            int8_key(4, "revision", revision as i64, Int8Comparison::Equal),
         ]
     };
     let mut scan = CatalogScan::open(
@@ -69,22 +79,84 @@ fn visit<K: Column, V: Column>(
         c"capture_chunks",
         c"capture_chunks_version_index",
         snapshot,
-        &keys(0),
+        &keys(0, manifest.chunks[0].revision),
     )
     .ok_or("checkpoint_metadata_missing")?;
+    // Before ALTER EXTENSION UPDATE creates the delta table, every delta is
+    // inline, as 0.6.0 stored it.
+    let mut appended = match CatalogScan::open(
+        c"syntra",
+        c"capture_chunk_deltas",
+        c"capture_chunk_deltas_pkey",
+        snapshot,
+        &keys(0, manifest.chunks[0].revision),
+    ) {
+        Some(scan) => Some(scan),
+        None if !crate::native_catalog::relation_exists(c"syntra", c"capture_chunk_deltas") => None,
+        None => return Err("checkpoint_metadata_missing"),
+    };
     let mut input_bytes = 0_usize;
-    // Fixed 64 native index probes share one scan; no per-partition SQL requests.
+    // Fixed native index probes share two scans; no per-partition SQL requests.
     for index in 0..PARTITIONS {
-        scan.rescan(&keys(index))
-            .ok_or("checkpoint_chunk_index_unavailable")?;
-        let row = scan.next().ok_or("invalid_checkpoint")?;
         let bit = 1_u64 << index;
         let reference = &manifest.chunks[index];
+        let fetch = (states | segments) & bit != 0;
+        // A delta row at the manifest revision means the chunk row holds only
+        // the base, at its base revision. Without one, the chunk row is at the
+        // manifest revision and carries any delta inline, as 0.6.0 wrote it.
+        let mut stored = Stored::Base;
+        let mut delta = None;
+        let mut delta_row = None;
+        if let (Some(d), Some(appended)) = (reference.delta, appended.as_mut()) {
+            appended
+                .rescan(&keys(index, reference.revision))
+                .ok_or("checkpoint_chunk_index_unavailable")?;
+            if let Some(row) = appended.next() {
+                if row.get::<pg_sys::Oid>(1, "source_relation") != Some(source.oid())
+                    || row.get::<i64>(2, "epoch") != Some(manifest.binding.epoch as i64)
+                    || row.get::<i16>(3, "partition") != Some(index as i16)
+                    || row.get::<i64>(4, "revision") != Some(reference.revision as i64)
+                    || row.get::<i64>(5, "row_count") != Some(i64::from(reference.rows))
+                {
+                    return Err("invalid_checkpoint");
+                }
+                if fetch {
+                    let len = encoded_delta_len::<K, V>(d.entries as usize)
+                        .map_err(|_| "invalid_checkpoint")?;
+                    input_bytes = super::input_bytes(input_bytes, len, byte_limit)?;
+                    let bytes = row
+                        .bytes_exact(6, "delta", len)
+                        .ok_or("invalid_checkpoint")?;
+                    PASS_BYTES.fetch_add(len as u64, Ordering::Relaxed);
+                    if digest(&bytes, keep).map_err(|_| "invalid_checkpoint")? != d.digest {
+                        return Err("invalid_checkpoint");
+                    }
+                    delta = Some(bytes);
+                }
+                stored = Stored::Appended;
+                delta_row = Some(row.tid());
+                if appended.next().is_some() {
+                    return Err("invalid_checkpoint");
+                }
+            } else {
+                stored = Stored::Inline;
+            }
+        } else if reference.delta.is_some() {
+            stored = Stored::Inline;
+        }
+        let (revision, rows) = if stored == Stored::Appended {
+            (reference.base_revision(), reference.base_rows())
+        } else {
+            (reference.revision, reference.rows)
+        };
+        scan.rescan(&keys(index, revision))
+            .ok_or("checkpoint_chunk_index_unavailable")?;
+        let row = scan.next().ok_or("invalid_checkpoint")?;
         if row.get::<pg_sys::Oid>(1, "source_relation") != Some(source.oid())
             || row.get::<i64>(2, "epoch") != Some(manifest.binding.epoch as i64)
             || row.get::<i16>(3, "partition") != Some(index as i16)
-            || row.get::<i64>(4, "revision") != Some(reference.revision as i64)
-            || row.get::<i64>(5, "row_count") != Some(i64::from(reference.rows))
+            || row.get::<i64>(4, "revision") != Some(revision as i64)
+            || row.get::<i64>(5, "row_count") != Some(i64::from(rows))
         {
             return Err("invalid_checkpoint");
         }
@@ -119,11 +191,10 @@ fn visit<K: Column, V: Column>(
         } else {
             None
         };
-        let delta = match reference.delta {
-            None if row.is_null(8, "delta", pg_sys::BYTEAOID) => None,
-            None => return Err("invalid_checkpoint"),
-            Some(_) if (states | segments) & bit == 0 => None,
-            Some(d) => {
+        let null = row.is_null(8, "delta", pg_sys::BYTEAOID);
+        match (stored, reference.delta) {
+            (Stored::Base, _) | (Stored::Appended, _) if !null => return Err("invalid_checkpoint"),
+            (Stored::Inline, Some(d)) if fetch => {
                 let len = encoded_delta_len::<K, V>(d.entries as usize)
                     .map_err(|_| "invalid_checkpoint")?;
                 input_bytes = super::input_bytes(input_bytes, len, byte_limit)?;
@@ -134,9 +205,10 @@ fn visit<K: Column, V: Column>(
                 if digest(&bytes, keep).map_err(|_| "invalid_checkpoint")? != d.digest {
                     return Err("invalid_checkpoint");
                 }
-                Some(bytes)
+                delta = Some(bytes);
             }
-        };
+            _ => {}
+        }
         if scan.next().is_some() {
             return Err("invalid_checkpoint");
         }
@@ -148,6 +220,8 @@ fn visit<K: Column, V: Column>(
         PASS_PEAK.fetch_max(held as u64, Ordering::Relaxed);
         each(Chunk {
             index,
+            stored,
+            delta_row,
             state,
             segment,
             delta,
@@ -377,6 +451,28 @@ pub(super) fn replay<K: Column, V: Column>(
     }
     Ok(result)
 }
+/// How the revision a write replaces is stored: an appended delta row is
+/// deleted at its position, and an inline 0.6.0 delta is cleared from its chunk
+/// row at its revision.
+struct Prior {
+    stored: Stored,
+    revision: i64,
+    delta_row: Option<String>,
+}
+impl Prior {
+    const NONE: Prior = Prior {
+        stored: Stored::Base,
+        revision: 0,
+        delta_row: None,
+    };
+    fn of(chunk: &Chunk, revision: u64) -> Prior {
+        Prior {
+            stored: chunk.stored,
+            revision: revision as i64,
+            delta_row: chunk.delta_row.clone(),
+        }
+    }
+}
 /// A new base for a partition, or only a new delta over its existing base.
 enum Write {
     Base {
@@ -385,17 +481,22 @@ enum Write {
         rows: i64,
         state: Vec<u8>,
         segment: Vec<u8>,
+        prior: Prior,
     },
     Delta {
         index: i16,
         revision: i64,
         rows: i64,
         delta: Vec<u8>,
+        base_revision: i64,
+        base_rows: i64,
+        prior: Prior,
     },
 }
 fn encode<K: Column, V: Column>(
     index: usize,
     state: &ReplayState<K, V>,
+    prior: Prior,
 ) -> Checked<(ChunkRef, Write)> {
     let keyed = state
         .encode_checkpoint(keep)
@@ -415,6 +516,7 @@ fn encode<K: Column, V: Column>(
         rows: state.rows().len() as i64,
         state: keyed,
         segment,
+        prior,
     };
     Ok((reference, write))
 }
@@ -423,35 +525,58 @@ fn persist(source: &PgRelation, manifest: &Manifest, writes: Vec<Write>) -> Chec
         (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let (mut delta_partitions, mut delta_revisions, mut delta_rows, mut deltas) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let (mut cleared_partitions, mut cleared_revisions, mut base_revisions, mut base_rows) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    let mut superseded = Vec::new();
     for w in writes {
-        match w {
+        let prior = match w {
             Write::Base {
                 index,
                 revision,
                 rows: n,
                 state,
                 segment,
+                prior,
             } => {
                 partitions.push(index);
                 revisions.push(revision);
                 rows.push(n);
                 states.push(state);
                 segments.push(segment);
+                prior
             }
             Write::Delta {
                 index,
                 revision,
                 rows: n,
                 delta,
+                base_revision,
+                base_rows: b,
+                prior,
             } => {
                 delta_partitions.push(index);
                 delta_revisions.push(revision);
                 delta_rows.push(n);
                 deltas.push(delta);
+                if prior.stored == Stored::Inline {
+                    cleared_partitions.push(index);
+                    cleared_revisions.push(prior.revision);
+                    base_revisions.push(base_revision);
+                    base_rows.push(b);
+                }
+                prior
             }
+        };
+        if prior.stored == Stored::Appended {
+            superseded.push(
+                prior
+                    .delta_row
+                    .ok_or("checkpoint chunk publication failed")?,
+            );
         }
     }
-    // Bound bulk statements; the manifest is published only after all chunks.
+    // No statement walks the versions an old snapshot keeps of other
+    // revisions. The manifest is published last.
     if !partitions.is_empty() {
         Spi::run_with_args(r#"INSERT INTO syntra.capture_chunks(source_relation,epoch,partition,revision,row_count,state,segment,delta)
             SELECT $1,$2,p,r,n,s,v,NULL FROM unnest($3::int2[],$4::int8[],$5::int8[],$6::bytea[],$7::bytea[]) AS t(p,r,n,s,v)
@@ -460,16 +585,12 @@ fn persist(source: &PgRelation, manifest: &Manifest, writes: Vec<Write>) -> Chec
             &[source.oid().into(),(manifest.binding.epoch as i64).into(),partitions.into(),revisions.into(),rows.into(),states.into(),segments.into()])
             .map_err(|_|"checkpoint chunk publication failed")?;
     }
-    // A delta write leaves state and segment unassigned, so PostgreSQL keeps their
-    // stored TOAST data and writes only the new row version and delta.
+    // A delta is a new row. The base row is not written, so its state and
+    // segment stay where they are and it gains no version per apply.
     if !deltas.is_empty() {
-        let expected = deltas.len() as i64;
-        let updated = Spi::get_one_with_args::<i64>(
-            r#"WITH u AS (UPDATE syntra.capture_chunks AS c
-            SET revision=t.r,row_count=t.n,delta=t.d
-            FROM unnest($3::int2[],$4::int8[],$5::int8[],$6::bytea[]) AS t(p,r,n,d)
-            WHERE c.source_relation=$1 AND c.epoch=$2 AND c.partition=t.p RETURNING 1)
-            SELECT count(*) FROM u"#,
+        Spi::run_with_args(
+            r#"INSERT INTO syntra.capture_chunk_deltas(source_relation,epoch,partition,revision,row_count,delta)
+            SELECT $1,$2,p,r,n,d FROM unnest($3::int2[],$4::int8[],$5::int8[],$6::bytea[]) AS t(p,r,n,d)"#,
             &[
                 source.oid().into(),
                 (manifest.binding.epoch as i64).into(),
@@ -480,7 +601,48 @@ fn persist(source: &PgRelation, manifest: &Manifest, writes: Vec<Write>) -> Chec
             ],
         )
         .map_err(|_| "checkpoint chunk publication failed")?;
-        if updated != Some(expected) {
+    }
+    // A chunk row written by 0.6.0 carries its delta inline at the old
+    // revision; once its delta moves to its own row, it holds only the base.
+    if !cleared_partitions.is_empty() {
+        let expected = cleared_partitions.len() as i64;
+        let cleared = Spi::get_one_with_args::<i64>(
+            r#"WITH u AS (UPDATE syntra.capture_chunks AS c
+            SET revision=t.b,row_count=t.n,delta=NULL
+            FROM unnest($3::int2[],$4::int8[],$5::int8[],$6::int8[]) AS t(p,r,b,n)
+            WHERE c.source_relation=$1 AND c.epoch=$2 AND c.partition=t.p AND c.revision=t.r RETURNING 1)
+            SELECT count(*) FROM u"#,
+            &[
+                source.oid().into(),
+                (manifest.binding.epoch as i64).into(),
+                cleared_partitions.into(),
+                cleared_revisions.into(),
+                base_revisions.into(),
+                base_rows.into(),
+            ],
+        )
+        .map_err(|_| "checkpoint chunk publication failed")?;
+        if cleared != Some(expected) {
+            return Err("checkpoint chunk publication failed");
+        }
+    }
+    // The rows are deleted at the positions the read found them, as a TID scan:
+    // a join on the key could plan a scan over every version the snapshot keeps.
+    // The maintenance lock keeps those positions current.
+    if !superseded.is_empty() {
+        let expected = superseded.len() as i64;
+        let deleted = Spi::get_one_with_args::<i64>(
+            r#"WITH d AS (DELETE FROM syntra.capture_chunk_deltas AS c
+            WHERE c.ctid=ANY($3::text[]::tid[]) AND c.source_relation=$1 AND c.epoch=$2 RETURNING 1)
+            SELECT count(*) FROM d"#,
+            &[
+                source.oid().into(),
+                (manifest.binding.epoch as i64).into(),
+                superseded.into(),
+            ],
+        )
+        .map_err(|_| "checkpoint chunk publication failed")?;
+        if deleted != Some(expected) {
             return Err("checkpoint chunk publication failed");
         }
     }
@@ -538,7 +700,7 @@ pub(super) fn seed<K: Column, V: Column>(
             keep,
         )
         .map_err(|_| "invalid_checkpoint")?;
-        let (reference, write) = encode(index, &state)?;
+        let (reference, write) = encode(index, &state, Prior::NONE)?;
         manifest.chunks[index] = reference;
         writes.push(write);
     }
@@ -598,7 +760,8 @@ pub(super) fn advance<K: Column, V: Column>(
                     .map_err(|_| "checkpoint replay rejected the captured event prefix")?;
                 let base = ReplayState::seed(state.binding(), revision, &rows, LIMITS, keep)
                     .map_err(|_| "checkpoint replay rejected the captured event prefix")?;
-                let (reference, write) = encode(chunk.index, &base)?;
+                let (reference, write) =
+                    encode(chunk.index, &base, Prior::of(&chunk, old.revision))?;
                 references.push((chunk.index, reference));
                 writes.push(write);
                 return Ok(());
@@ -630,6 +793,9 @@ pub(super) fn advance<K: Column, V: Column>(
                 revision: revision as i64,
                 rows: i64::from(rows),
                 delta: bytes,
+                base_revision: state.sequence() as i64,
+                base_rows: state.rows().len() as i64,
+                prior: Prior::of(&chunk, old.revision),
             });
             Ok(())
         },

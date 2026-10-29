@@ -60,6 +60,15 @@ fn syntra_ddl_drop_guard(fcinfo: pg_sys::FunctionCallInfo) {
     }
     // Delete dropped sources before updating dropped-guard epochs, so a source
     // removed together with its trigger is never modified twice by one command.
+    // Before ALTER EXTENSION UPDATE creates the delta table there is nothing in it.
+    if crate::native_catalog::relation_exists(c"syntra", c"capture_chunk_deltas") {
+        Spi::run(
+            r#"DELETE FROM syntra.capture_chunk_deltas AS p
+            USING pg_catalog.pg_event_trigger_dropped_objects() AS d
+            WHERE d.classid = 'pg_catalog.pg_class'::regclass::oid AND d.objid = p.source_relation"#,
+        )
+        .unwrap_or_else(|e| pgrx::error!("{}", e));
+    }
     Spi::run(
         r#"DELETE FROM syntra.capture_chunks AS p
         USING pg_catalog.pg_event_trigger_dropped_objects() AS d

@@ -67,6 +67,17 @@ fn row_trigger_valid(source: &PgRelation, oid: pg_sys::Oid, procedure: pg_sys::O
         || trigger_valid(source, oid, procedure, 29, false)
 }
 
+/// Deletes a source's appended checkpoint deltas. Before `ALTER EXTENSION
+/// UPDATE` creates their table there are none.
+fn delete_appended_deltas(source: pg_sys::Oid) {
+    if crate::native_catalog::relation_exists(c"syntra", c"capture_chunk_deltas") {
+        Spi::run_with_args(
+            "DELETE FROM syntra.capture_chunk_deltas WHERE source_relation=$1",
+            &[source.into()],
+        )
+        .unwrap_or_else(|e| pgrx::error!("{}", e));
+    }
+}
 fn install(
     source: &PgRelation,
     name: &CStr,
@@ -325,6 +336,7 @@ fn syntra_seed_capture(
     );
     let row_count = rows.len() as i64;
     let identity = crate::live::identity(&source, value);
+    delete_appended_deltas(source.oid());
     Spi::run_with_args("DELETE FROM syntra.capture_chunks WHERE source_relation=$1; DELETE FROM syntra.capture_checkpoints WHERE source_relation=$1; DELETE FROM syntra.capture_events WHERE source_relation=$1; DELETE FROM syntra.capture_marks WHERE source_relation=$1; DELETE FROM syntra.capture_base_rows WHERE source_relation=$1; DELETE FROM syntra.capture_heads WHERE source_relation=$1",&[source.oid().into()])
         .unwrap_or_else(|e|pgrx::error!("{}",e));
     let epoch=Spi::get_one_with_args::<i64>(r#"WITH seeded AS (INSERT INTO syntra.capture_heads
@@ -429,6 +441,7 @@ fn syntra_stop_capture(source: PgRelation) -> bool {
             pg_sys::performDeletion(&address, pg_sys::DropBehavior::DROP_RESTRICT, 0);
         }
     }
+    delete_appended_deltas(source.oid());
     Spi::run_with_args("DELETE FROM syntra.capture_chunks WHERE source_relation=$1; DELETE FROM syntra.capture_checkpoints WHERE source_relation=$1; DELETE FROM syntra.capture_events WHERE source_relation=$1; DELETE FROM syntra.capture_marks WHERE source_relation=$1; DELETE FROM syntra.capture_base_rows WHERE source_relation=$1",&[source.oid().into()])
         .unwrap_or_else(|e|pgrx::error!("{}",e));
     let removed=Spi::get_one_with_args::<i64>("WITH removed AS (DELETE FROM syntra.capture_heads WHERE source_relation=$1 RETURNING epoch) SELECT count(*) FROM removed",&[source.oid().into()])

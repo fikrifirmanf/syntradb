@@ -148,6 +148,26 @@ upgrade-under-load check must pass from 0.1.0, 0.2.0 and 0.3.0.
    ([soak](checkpoint-soak.md#040-and-a-control-2026-10-28)). That shows no
    latency cost from the deltas, without ruling out a small one.
 
+## 0.7.0: one row per delta
+
+Through 0.6.0 a delta lived in the `delta` column of its partition's chunk row,
+and every apply that changed the partition updated that row. Under a held
+snapshot each update left a version that the next apply walked, so applies
+slowed as the hold aged and pruning stalled behind them. 0.7.0 keeps the base in
+the chunk row, at its base revision, and writes each delta as a row of
+`syntra.capture_chunk_deltas` at the manifest revision:
+
+- apply inserts the new delta row and deletes the one it replaces at the
+  physical position its read found, as a TID scan, so no statement walks the
+  versions a snapshot keeps of other revisions;
+- a fold rewrites the chunk row and deletes the partition's delta row;
+- readers look for a delta row at the manifest revision. With one, the chunk
+  row must hold the base at its base revision with no inline delta; without
+  one, the chunk row must be at the manifest revision, as 0.6.0 wrote it;
+- before `ALTER EXTENSION UPDATE` creates the table, every delta is inline.
+
+The manifest records the same references, so no format changes.
+
 ## Not changed
 
 Partition count and routing, the 1,000,000-row and 4,096-event limits, the public

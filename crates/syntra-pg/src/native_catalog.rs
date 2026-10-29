@@ -239,6 +239,14 @@ impl OwnedField for Vec<u8> {}
 impl OwnedField for Vec<Option<i64>> {}
 
 impl Row<'_> {
+    /// The tuple's physical position, in `tid` text form.
+    pub fn tid(&self) -> String {
+        // SAFETY: the tuple is pinned for this Row's borrow of the scan.
+        let at = unsafe { (*self.tuple).t_self };
+        let block = (u32::from(at.ip_blkid.bi_hi) << 16) | u32::from(at.ip_blkid.bi_lo);
+        format!("({block},{})", at.ip_posid)
+    }
+
     pub fn name(&self, attribute: i16, name: &str) -> Option<String> {
         let descriptor = self.relation.tuple_desc();
         let field = descriptor.iter().find(|a| a.attnum == attribute)?;
@@ -358,6 +366,17 @@ impl Row<'_> {
                 .ok()
                 .flatten()
         }
+    }
+}
+
+/// Whether `schema.table` exists. Between installing a library and running
+/// `ALTER EXTENSION UPDATE`, a table that release adds is not there yet.
+pub(super) fn relation_exists(schema: &CStr, table: &CStr) -> bool {
+    // SAFETY: backend thread; lookups by internal static names, no locks taken.
+    unsafe {
+        let namespace = pg_sys::get_namespace_oid(schema.as_ptr(), true);
+        namespace != pg_sys::InvalidOid
+            && pg_sys::get_relname_relid(table.as_ptr(), namespace) != pg_sys::InvalidOid
     }
 }
 

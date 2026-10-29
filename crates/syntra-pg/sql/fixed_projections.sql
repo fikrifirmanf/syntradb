@@ -219,6 +219,21 @@ CREATE TABLE syntra.capture_chunks (
     FOREIGN KEY(source_relation,epoch) REFERENCES syntra.capture_bindings(source_relation,epoch) ON DELETE CASCADE
 );
 CREATE INDEX capture_chunks_version_index ON syntra.capture_chunks(source_relation,epoch,partition,revision);
+-- A partition's delta, one row per revision. Apply appends a row and deletes
+-- the one it replaces instead of updating the chunk row, so a long-held
+-- snapshot does not leave versions of the chunk row for every lookup to walk.
+-- The chunk row then holds the base at its base revision.
+CREATE TABLE syntra.capture_chunk_deltas (
+    source_relation oid NOT NULL,
+    epoch bigint NOT NULL,
+    partition smallint NOT NULL CHECK (partition BETWEEN 0 AND 63),
+    revision bigint NOT NULL CHECK (revision>0),
+    row_count bigint NOT NULL CHECK (row_count BETWEEN 0 AND 1000000),
+    delta bytea NOT NULL CHECK (octet_length(delta) BETWEEN 85 AND 65536),
+    PRIMARY KEY(source_relation,epoch,partition,revision),
+    FOREIGN KEY(source_relation,epoch) REFERENCES syntra.capture_bindings(source_relation,epoch) ON DELETE CASCADE
+);
+REVOKE ALL ON syntra.capture_chunk_deltas FROM PUBLIC;
 REVOKE ALL ON syntra.capture_chunks FROM PUBLIC;
 REVOKE ALL ON syntra.capture_checkpoints FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.syntra_apply_capture(regclass) FROM PUBLIC;

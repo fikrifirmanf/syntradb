@@ -66,7 +66,7 @@ fn layout_sql(column: CheckpointColumn) -> (&'static str, &'static str, &'static
 const PROGRESS: &str = "SELECT h.epoch,h.emitted,h.pruned,h.live_rows,c.applied,c.manifest FROM (SELECT hh.source_relation,hh.epoch,hh.base_rows,hh.pruned,coalesce(m.ordinal,hh.emitted) AS emitted,coalesce(m.live_rows,hh.live_rows) AS live_rows FROM syntra.capture_heads AS hh LEFT JOIN LATERAL (SELECT ordinal,live_rows FROM syntra.capture_marks WHERE epoch=hh.epoch AND ordinal>hh.emitted ORDER BY ordinal DESC LIMIT 1) AS m ON true) AS h JOIN syntra.capture_checkpoints AS c USING(source_relation,epoch) WHERE h.source_relation='checkpoint_stress_source'::regclass LIMIT 1";
 // Soak vacuum runs on its own clock, independent of the offered worker rate.
 const VACUUM_INTERVAL: Duration = Duration::from_secs(5);
-const VACUUM: &str = "VACUUM (ANALYZE) syntra.capture_events, syntra.capture_marks, syntra.capture_chunks, syntra.capture_checkpoints, syntra.capture_heads, checkpoint_stress_source";
+const VACUUM: &str = "VACUUM (ANALYZE) syntra.capture_events, syntra.capture_marks, syntra.capture_chunks, syntra.capture_chunk_deltas, syntra.capture_checkpoints, syntra.capture_heads, checkpoint_stress_source";
 const LIMITS: Limits = Limits {
     rows: 1_000_000,
     changes: 4096,
@@ -204,7 +204,9 @@ where
             && manifest.rows()? == rows as u32,
         "checkpoint stress durable cursor disagreed with manifest",
     )?;
-    let chunks=client.query("SELECT partition,epoch,revision,row_count,state,segment,delta FROM syntra.capture_chunks WHERE source_relation='checkpoint_stress_source'::regclass ORDER BY partition LIMIT 65",&[])?;
+    // A partition's delta is either inline in its chunk row, as 0.6.0 stored it,
+    // or the one row of capture_chunk_deltas at the manifest revision.
+    let chunks=client.query("SELECT c.partition,c.epoch,c.revision,c.row_count,c.state,c.segment,coalesce(d.delta,c.delta),d.revision,d.row_count,c.delta IS NOT NULL FROM syntra.capture_chunks AS c LEFT JOIN syntra.capture_chunk_deltas AS d ON d.source_relation=c.source_relation AND d.epoch=c.epoch AND d.partition=c.partition WHERE c.source_relation='checkpoint_stress_source'::regclass ORDER BY c.partition LIMIT 65",&[])?;
     require(
         chunks.len() == PARTITIONS,
         "checkpoint stress missing chunk",
@@ -216,11 +218,27 @@ where
         let state_bytes: Vec<u8> = chunk.try_get(4)?;
         let segment: Vec<u8> = chunk.try_get(5)?;
         let delta_bytes: Option<Vec<u8>> = chunk.try_get(6)?;
+        let appended: Option<i64> = chunk.try_get(7)?;
+        let inline: bool = chunk.try_get(9)?;
+        // An appended delta leaves the chunk row at its base revision.
+        let (revision, rows) = match appended {
+            Some(_) => (reference.base_revision(), reference.base_rows()),
+            None => (reference.revision, reference.rows),
+        };
+        require(
+            appended.is_none_or(|r| {
+                !inline
+                    && r == reference.revision as i64
+                    && chunk.try_get::<_, Option<i64>>(8).ok().flatten()
+                        == Some(i64::from(reference.rows))
+            }),
+            "checkpoint stress appended delta mismatch",
+        )?;
         require(
             chunk.try_get::<_, i16>(0)? == index as i16
                 && chunk.try_get::<_, i64>(1)? == epoch
-                && chunk.try_get::<_, i64>(2)? == reference.revision as i64
-                && chunk.try_get::<_, i64>(3)? == i64::from(reference.rows)
+                && chunk.try_get::<_, i64>(2)? == revision as i64
+                && chunk.try_get::<_, i64>(3)? == i64::from(rows)
                 && digest(&state_bytes, || true)? == reference.state_digest
                 && digest(&segment, || true)? == reference.segment_digest
                 && delta_bytes.is_some() == reference.delta.is_some(),
@@ -672,7 +690,7 @@ impl Drop for StopOnExit<'_> {
     }
 }
 fn footprint(client: &mut Client) -> Result<Value> {
-    Ok(client.query_one("SELECT json_build_object('source_bytes',pg_total_relation_size('checkpoint_stress_source'),'checkpoint_catalog_bytes',pg_total_relation_size('syntra.capture_checkpoints')+pg_total_relation_size('syntra.capture_chunks'),'checkpoint_manifest_bytes',pg_total_relation_size('syntra.capture_checkpoints'),'checkpoint_chunk_bytes',pg_total_relation_size('syntra.capture_chunks'),'event_catalog_bytes',pg_total_relation_size('syntra.capture_events'),'base_catalog_bytes',pg_total_relation_size('syntra.capture_base_rows'),'head_catalog_bytes',pg_total_relation_size('syntra.capture_heads'),'wal_lsn',pg_current_wal_insert_lsn()::text,'emitted',h.emitted,'pruned',h.pruned,'applied',c.applied,'generation',c.generation,'retained_events',(SELECT count(*) FROM syntra.capture_events WHERE source_relation=h.source_relation)) FROM (SELECT hh.source_relation,hh.epoch,hh.base_rows,hh.pruned,coalesce(m.ordinal,hh.emitted) AS emitted,coalesce(m.live_rows,hh.live_rows) AS live_rows FROM syntra.capture_heads AS hh LEFT JOIN LATERAL (SELECT ordinal,live_rows FROM syntra.capture_marks WHERE epoch=hh.epoch AND ordinal>hh.emitted ORDER BY ordinal DESC LIMIT 1) AS m ON true) AS h JOIN syntra.capture_checkpoints AS c USING(source_relation,epoch) WHERE h.source_relation='checkpoint_stress_source'::regclass LIMIT 1",&[])?.try_get(0)?)
+    Ok(client.query_one("SELECT json_build_object('source_bytes',pg_total_relation_size('checkpoint_stress_source'),'checkpoint_catalog_bytes',pg_total_relation_size('syntra.capture_checkpoints')+pg_total_relation_size('syntra.capture_chunks')+pg_total_relation_size('syntra.capture_chunk_deltas'),'checkpoint_delta_bytes',pg_total_relation_size('syntra.capture_chunk_deltas'),'checkpoint_manifest_bytes',pg_total_relation_size('syntra.capture_checkpoints'),'checkpoint_chunk_bytes',pg_total_relation_size('syntra.capture_chunks'),'event_catalog_bytes',pg_total_relation_size('syntra.capture_events'),'base_catalog_bytes',pg_total_relation_size('syntra.capture_base_rows'),'head_catalog_bytes',pg_total_relation_size('syntra.capture_heads'),'wal_lsn',pg_current_wal_insert_lsn()::text,'emitted',h.emitted,'pruned',h.pruned,'applied',c.applied,'generation',c.generation,'retained_events',(SELECT count(*) FROM syntra.capture_events WHERE source_relation=h.source_relation)) FROM (SELECT hh.source_relation,hh.epoch,hh.base_rows,hh.pruned,coalesce(m.ordinal,hh.emitted) AS emitted,coalesce(m.live_rows,hh.live_rows) AS live_rows FROM syntra.capture_heads AS hh LEFT JOIN LATERAL (SELECT ordinal,live_rows FROM syntra.capture_marks WHERE epoch=hh.epoch AND ordinal>hh.emitted ORDER BY ordinal DESC LIMIT 1) AS m ON true) AS h JOIN syntra.capture_checkpoints AS c USING(source_relation,epoch) WHERE h.source_relation='checkpoint_stress_source'::regclass LIMIT 1",&[])?.try_get(0)?)
 }
 pub(super) fn run(cluster: &Cluster, options: &Options) -> Result<Value> {
     let soak = options.checkpoint_soak_seconds > 0;

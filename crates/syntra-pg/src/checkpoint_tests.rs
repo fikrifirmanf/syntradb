@@ -125,7 +125,9 @@ fn checkpoint_pruning_preserves_events_newer_than_the_applied_prefix() {
 fn chunked_apply_rewrites_only_the_changed_partition() {
     capture_fixture("CREATE TABLE checkpoint_dirty(id int4 PRIMARY KEY,v int4); INSERT INTO checkpoint_dirty SELECT n,n FROM generate_series(1,1000) AS n; SELECT syntra_seed_capture('checkpoint_dirty','id','v',8); SELECT syntra_apply_capture('checkpoint_dirty'); CREATE TEMP TABLE prior_chunks AS SELECT partition,ctid::text AS tuple,revision,state,segment FROM syntra.capture_chunks WHERE source_relation='checkpoint_dirty'::regclass");
     Spi::run("UPDATE checkpoint_dirty SET v=44 WHERE id=1; SELECT syntra_apply_capture('checkpoint_dirty')").unwrap();
-    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=64 AND count(*) FILTER(WHERE c.ctid::text<>p.tuple)=1 AND bool_and(CASE WHEN c.partition=55 THEN c.revision=1 ELSE c.revision=0 AND c.state=p.state AND c.segment=p.segment END) FROM syntra.capture_chunks AS c JOIN prior_chunks AS p USING(partition) WHERE c.source_relation='checkpoint_dirty'::regclass").unwrap(),Some(true));
+    // The change is appended as partition 55's delta; no chunk row is written.
+    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=64 AND count(*) FILTER(WHERE c.ctid::text<>p.tuple)=0 AND bool_and(c.revision=0 AND c.state=p.state AND c.segment=p.segment AND c.delta IS NULL) FROM syntra.capture_chunks AS c JOIN prior_chunks AS p USING(partition) WHERE c.source_relation='checkpoint_dirty'::regclass").unwrap(),Some(true));
+    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=1 AND bool_and(d.partition=55 AND d.revision=1 AND d.row_count=c.row_count) FROM syntra.capture_chunk_deltas AS d JOIN syntra.capture_chunks AS c USING(source_relation,partition) WHERE d.source_relation='checkpoint_dirty'::regclass").unwrap(),Some(true));
     let bytes=Spi::get_one::<Vec<u8>>("SELECT manifest FROM syntra.capture_checkpoints WHERE source_relation='checkpoint_dirty'::regclass LIMIT 1").unwrap().unwrap();
     let manifest = syntra_storage::chunks::Manifest::decode(&bytes).unwrap();
     assert_eq!(
@@ -143,14 +145,14 @@ fn chunked_apply_rewrites_only_the_changed_partition() {
 fn chunked_publication_rolls_back_chunks_when_manifest_update_fails() {
     capture_fixture("CREATE TABLE checkpoint_publish_abort(id int4 PRIMARY KEY,v int4); INSERT INTO checkpoint_publish_abort VALUES(1,10); SELECT syntra_seed_capture('checkpoint_publish_abort','id','v',8); SELECT syntra_apply_capture('checkpoint_publish_abort'); CREATE TEMP TABLE prior_abort_chunks AS SELECT partition,state,segment,revision FROM syntra.capture_chunks WHERE source_relation='checkpoint_publish_abort'::regclass; UPDATE checkpoint_publish_abort SET id=2,v=11 WHERE id=1; CREATE FUNCTION reject_checkpoint_manifest() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected manifest rejection'; END $$; CREATE TRIGGER reject_manifest BEFORE UPDATE ON syntra.capture_checkpoints FOR EACH ROW EXECUTE FUNCTION reject_checkpoint_manifest()");
     Spi::run("DO $$ BEGIN PERFORM syntra_apply_capture('checkpoint_publish_abort'); RAISE EXCEPTION 'apply unexpectedly succeeded'; EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'injected manifest rejection' THEN RAISE; END IF; END $$").unwrap();
-    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=64 AND bool_and(c.state=p.state AND c.segment=p.segment AND c.revision=p.revision) FROM syntra.capture_chunks AS c JOIN prior_abort_chunks AS p USING(partition) WHERE c.source_relation='checkpoint_publish_abort'::regclass").unwrap(),Some(true));
+    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=64 AND bool_and(c.state=p.state AND c.segment=p.segment AND c.revision=p.revision) AND NOT EXISTS(SELECT FROM syntra.capture_chunk_deltas WHERE source_relation='checkpoint_publish_abort'::regclass) FROM syntra.capture_chunks AS c JOIN prior_abort_chunks AS p USING(partition) WHERE c.source_relation='checkpoint_publish_abort'::regclass").unwrap(),Some(true));
     assert_eq!(Spi::get_one::<bool>("SELECT applied=0 AND generation=1 FROM syntra.capture_checkpoints WHERE source_relation='checkpoint_publish_abort'::regclass LIMIT 1").unwrap(),Some(true));
     Spi::run("DROP TRIGGER reject_manifest ON syntra.capture_checkpoints").unwrap();
     assert_eq!(
         Spi::get_one::<i64>("SELECT syntra_apply_capture('checkpoint_publish_abort')").unwrap(),
         Some(2)
     );
-    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=2 AND min(partition)=6 AND max(partition)=55 FROM syntra.capture_chunks WHERE source_relation='checkpoint_publish_abort'::regclass AND revision=1").unwrap(),Some(true));
+    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=2 AND min(partition)=6 AND max(partition)=55 FROM (SELECT partition,revision FROM syntra.capture_chunks WHERE source_relation='checkpoint_publish_abort'::regclass UNION ALL SELECT partition,revision FROM syntra.capture_chunk_deltas WHERE source_relation='checkpoint_publish_abort'::regclass) AS c WHERE revision=1").unwrap(),Some(true));
 }
 
 #[pg_test(error = "invalid_checkpoint")]
@@ -209,9 +211,9 @@ fn chunked_layout_handles_deliberately_colliding_keys() {
     )
     .unwrap();
     Spi::run("SELECT syntra_seed_capture('checkpoint_skew','id','v',8); SELECT syntra_apply_capture('checkpoint_skew'); UPDATE checkpoint_skew SET v=NULL WHERE id=0; SELECT syntra_apply_capture('checkpoint_skew')").unwrap();
-    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=64 AND max(row_count)=1000 AND count(*) FILTER(WHERE revision=1)=1 AND max(revision) FILTER(WHERE partition=0)=1 FROM syntra.capture_chunks WHERE source_relation='checkpoint_skew'::regclass").unwrap(),Some(true));
+    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=64 AND max(row_count)=1000 AND bool_and(revision=0 AND delta IS NULL) FROM syntra.capture_chunks WHERE source_relation='checkpoint_skew'::regclass").unwrap(),Some(true));
     // One changed row is a delta over partition 0's unchanged 1,000-row base.
-    assert_eq!(Spi::get_one::<bool>("SELECT count(*) FILTER(WHERE delta IS NOT NULL)=1 AND bool_and(delta IS NULL) FILTER(WHERE partition<>0) AND (SELECT s.rows=1000 AND s.non_nulls=1000 FROM syntra.capture_chunks AS c,LATERAL syntra_segment_summary(c.segment) AS s WHERE c.source_relation='checkpoint_skew'::regclass AND partition=0) FROM syntra.capture_chunks WHERE source_relation='checkpoint_skew'::regclass").unwrap(),Some(true));
+    assert_eq!(Spi::get_one::<bool>("SELECT (SELECT string_agg(partition||':'||revision||':'||row_count,',') FROM syntra.capture_chunk_deltas WHERE source_relation='checkpoint_skew'::regclass)='0:1:1000' AND (SELECT s.rows=1000 AND s.non_nulls=1000 FROM syntra.capture_chunks AS c,LATERAL syntra_segment_summary(c.segment) AS s WHERE c.source_relation='checkpoint_skew'::regclass AND partition=0)").unwrap(),Some(true));
     let (summary, replayed) = tail_snapshot("checkpoint_skew").unwrap();
     assert_eq!((summary.0, summary.1, replayed), (1000, 999, false));
 }
@@ -456,9 +458,10 @@ fn combined_maintenance_rejects_clean_partition_damage_and_rolls_back_publicatio
 #[pg_test]
 fn combined_maintenance_checks_bytes_altered_during_publication() {
     capture_fixture("CREATE TABLE combined_stored(id int4 PRIMARY KEY,v int4); INSERT INTO combined_stored VALUES(1,10); SELECT syntra_seed_capture('combined_stored','id','v',16); SELECT syntra_apply_capture('combined_stored'); UPDATE combined_stored SET v=11 WHERE id=1");
-    Spi::run("CREATE FUNCTION combined_damage() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.segment=set_byte(NEW.segment,0,get_byte(NEW.segment,0) # 1); RETURN NEW; END $$; CREATE TRIGGER combined_damage BEFORE UPDATE ON syntra.capture_chunks FOR EACH ROW EXECUTE FUNCTION combined_damage(); DO $$ BEGIN PERFORM syntra_apply_prune_capture('combined_stored'); EXCEPTION WHEN object_not_in_prerequisite_state THEN NULL; END $$").unwrap();
+    // The apply appends a delta row; damage its bytes as they are written.
+    Spi::run("CREATE FUNCTION combined_damage() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.delta=set_byte(NEW.delta,80,get_byte(NEW.delta,80) # 1); RETURN NEW; END $$; CREATE TRIGGER combined_damage BEFORE INSERT ON syntra.capture_chunk_deltas FOR EACH ROW EXECUTE FUNCTION combined_damage(); DO $$ BEGIN PERFORM syntra_apply_prune_capture('combined_stored'); EXCEPTION WHEN object_not_in_prerequisite_state THEN NULL; END $$").unwrap();
     assert_eq!(Spi::get_one::<bool>("SELECT c.applied=0 AND c.generation=1 AND h.pruned=0 AND (SELECT count(*) FROM syntra.capture_events WHERE source_relation=h.source_relation)=1 FROM syntra.capture_heads AS h JOIN syntra.capture_checkpoints AS c USING(source_relation,epoch) WHERE h.source_relation='combined_stored'::regclass LIMIT 1").unwrap(),Some(true));
-    Spi::run("DROP TRIGGER combined_damage ON syntra.capture_chunks").unwrap();
+    Spi::run("DROP TRIGGER combined_damage ON syntra.capture_chunk_deltas").unwrap();
     assert_eq!(
         Spi::get_one::<bool>(
             "SELECT applied=1 AND pruned=1 FROM syntra_apply_prune_capture('combined_stored')"

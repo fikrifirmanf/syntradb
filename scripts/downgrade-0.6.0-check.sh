@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Downgrade a live database from the workspace release (0.6.0) to 0.5.0 and back.
+# Downgrade a live database from 0.6.0 to 0.5.0 and back, both built from baselines.
 # 0.6.0 fires the capture row trigger at commit; 0.5.0 accepts only an immediate
 # trigger, so the downgrade replaces it. A writer that has queued changes but not
 # committed when the downgrade starts must make the downgrade wait, and its
@@ -15,23 +15,20 @@ bash scripts/setup-production.sh
 export PGRX_HOME="$SYNTRA_ROOT/.pgrx"
 export PATH="$SYNTRA_ROOT/.tools/bin:$PATH"
 OLD=0.5.0
-CURRENT="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
-if [[ "$CURRENT" != 0.6.0 ]]; then
-    echo "downgrade check failed: this check covers 0.6.0 to 0.5.0, workspace is '$CURRENT'" >&2
-    exit 1
-fi
+CURRENT=0.6.0
 WORK="$SYNTRA_ROOT/target/downgrade-0.6.0-check/$(date +%Y%m%d-%H%M%S)-$$"
-mkdir -p "$WORK/base"
+mkdir -p "$WORK/base" "$WORK/current"
 cp -R .tools/postgresql-production/18.6/install "$WORK/pg"
 PG_CONFIG="$WORK/pg/bin/pg_config"
 BIN="$WORK/pg/bin"
 tar xzf "build-support/upgrade-baselines/syntradb-$OLD-src.tgz" -C "$WORK/base"
+tar xzf "build-support/upgrade-baselines/syntradb-$CURRENT-src.tgz" -C "$WORK/current"
 install_from() {
     (cd "$1/crates/syntra-pg" && CARGO_TARGET_DIR="$2" cargo pgrx install --release \
         --cargo=--locked --pg-config "$PG_CONFIG")
 }
 install_old() { install_from "$WORK/base" "$SYNTRA_ROOT/target/upgrade-baseline-$OLD"; }
-install_current() { install_from "$SYNTRA_ROOT" "$SYNTRA_ROOT/target/upgrade-current"; }
+install_current() { install_from "$WORK/current" "$SYNTRA_ROOT/target/upgrade-baseline-$CURRENT"; }
 
 SOCKET="$(mktemp -d /tmp/syntra-downgrade6.XXXXXX)"
 "$BIN/initdb" -D "$WORK/data" --username=downgrader --auth=trust --no-locale --encoding=UTF8 >/dev/null
@@ -137,7 +134,7 @@ stop
 
 install_current
 start
-# unslop-ignore NO_SQL_INTERPOLATION -- CURRENT is checked to be 0.6.0 above; ALTER EXTENSION takes no bind parameters.
+# unslop-ignore NO_SQL_INTERPOLATION -- CURRENT is the literal 0.6.0 above; ALTER EXTENSION takes no bind parameters.
 q downgraded "ALTER EXTENSION syntradb UPDATE TO '$CURRENT'"
 # unslop-ignore NO_SQL_INTERPOLATION -- TRIGGER is the constant query defined above.
 expect "trigger after the second update" "$(q downgraded "$TRIGGER")" "true:true:A"

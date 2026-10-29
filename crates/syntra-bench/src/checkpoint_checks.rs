@@ -315,7 +315,8 @@ fn combined_concurrent_cut(cluster: &Cluster) -> Result<()> {
         )?
         .try_get(0)?;
     producer.batch_execute("SET statement_timeout='15s'; SET lock_timeout='5s'; UPDATE combined_cut SET v=11 WHERE id=1")?;
-    admin.batch_execute("CREATE FUNCTION combined_cut_gate() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.source_relation='combined_cut'::regclass THEN PERFORM pg_advisory_xact_lock(735190019::bigint); END IF; RETURN NEW; END $$; CREATE TRIGGER combined_cut_gate BEFORE UPDATE ON syntra.capture_chunks FOR EACH ROW EXECUTE FUNCTION combined_cut_gate(); SELECT pg_advisory_lock(735190019::bigint)")?;
+    // Publication appends the partition delta; hold it there, mid-transaction.
+    admin.batch_execute("CREATE FUNCTION combined_cut_gate() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.source_relation='combined_cut'::regclass THEN PERFORM pg_advisory_xact_lock(735190019::bigint); END IF; RETURN NEW; END $$; CREATE TRIGGER combined_cut_gate BEFORE INSERT ON syntra.capture_chunk_deltas FOR EACH ROW EXECUTE FUNCTION combined_cut_gate(); SELECT pg_advisory_lock(735190019::bigint)")?;
     maintenance.batch_execute("SET statement_timeout='15s'; SET lock_timeout='5s'")?;
     let pid: i32 = maintenance
         .query_one("SELECT pg_backend_pid()", &[])?
@@ -369,7 +370,7 @@ fn combined_concurrent_cut(cluster: &Cluster) -> Result<()> {
     )?;
     require(old==10 && older.query_one("SELECT sum=10 AND route='checkpoint' FROM syntra_checkpoint_int4_summary('combined_cut','v') LIMIT 1", &[])?.try_get(0)?,"combined maintenance changed an old source snapshot")?;
     older.batch_execute("COMMIT")?;
-    admin.batch_execute("DROP TRIGGER combined_cut_gate ON syntra.capture_chunks; DROP FUNCTION combined_cut_gate()")?;
+    admin.batch_execute("DROP TRIGGER combined_cut_gate ON syntra.capture_chunk_deltas; DROP FUNCTION combined_cut_gate()")?;
     let final_row = admin.query_one(
         "SELECT applied,pruned FROM syntra_apply_prune_capture('combined_cut')",
         &[],

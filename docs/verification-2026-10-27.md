@@ -631,3 +631,16 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   the pruner was then refused the busy maintenance lock on 94,053 of 215,732
   attempts, and writers slowed after it. See
   [the soak](checkpoint-soak.md#two-hour-hold-on-060-int4-quiet-rerun-2026-10-29).
+- **0.7.0 appended deltas.** Each partition delta is a row of
+  `syntra.capture_chunk_deltas`; apply no longer updates the chunk row. The full
+  check passed with 193 PostgreSQL tests
+  (`benchmarks/results/check-070-2026-10-30.log`). Upgrades from 0.1.0 through
+  0.6.0 to 0.7.0 passed with 530 catalog entries identical to a fresh install,
+  the 0.7.0, 0.6.0, 0.5.0 and 0.4.0 downgrade checks passed, and upgrades under
+  four writers from 0.3.0, 0.5.0 and 0.6.0 failed no write. Six planted bugs
+  failed a check (`benchmarks/results/planted-bugs-0.7.0-2026-10-30.txt`): an
+  apply that kept replaced delta rows, readers that ignored the table, an apply
+  that left a moved inline delta's chunk row at its old revision, readers that
+  accepted an inline copy beside an appended delta (missed until a test was
+  added), an update without the table, and a downgrade that dropped the deltas.
+  See [upgrades](upgrades.md#060-to-070). Not yet measured under a held snapshot.

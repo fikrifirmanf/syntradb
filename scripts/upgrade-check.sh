@@ -88,7 +88,23 @@ stop
 
 install_from "$SYNTRA_ROOT" "$SYNTRA_ROOT/target/upgrade-current"
 start
-if [[ "$FROM" == 0.5.0 ]]; then
+if [[ "$FROM" == 0.6.0 ]]; then
+    # 0.7.0 adds only the delta table. Writes are captured and reads replay the
+    # inline deltas 0.6.0 stored; an apply that would append a delta fails and
+    # publishes nothing until the update creates the table.
+    q upgraded "UPDATE feed SET v=0 WHERE id=1"
+    BEFORE_EVENTS=1
+    # unslop-ignore NO_SQL_INTERPOLATION -- READ is the constant query defined above.
+    expect "read before the update" "$(q upgraded "$READ")" "replay:true"
+    # unslop-ignore NO_SQL_INTERPOLATION -- LIVE is the constant query defined above.
+    expect "trusted read before the update" "$(q upgraded "$LIVE")" "heap:version_changed:true"
+    # unslop-ignore NO_SQL_INTERPOLATION -- constant SQL; only the stderr path is a variable.
+    if q upgraded "SELECT syntra_apply_capture('feed')" >/dev/null 2>"$WORK/apply-before.err"; then
+        echo "upgrade check failed: an apply appended a delta before ALTER EXTENSION UPDATE" >&2
+        exit 1
+    fi
+    expect "applied before the update" "$(q upgraded "SELECT applied FROM syntra_capture_lag('feed')")" "10"
+elif [[ "$FROM" == 0.5.0 ]]; then
     # The 0.6.0 library accepts the immediate row trigger 0.5.0 installed, so
     # writes are captured and reads replay before the update.
     q upgraded "UPDATE feed SET v=0 WHERE id=1"
@@ -130,11 +146,13 @@ else
     BEFORE_EVENTS=0
 fi
 # A writer that arrives while the update is still open must never be captured
-# against a half-updated catalog. The last step, 0.5.0 to 0.6.0, replaces the
-# source's row trigger under a table lock that it holds to commit, so from every
-# release the writer waits and, after commit, reads the new bindings and is
+# against a half-updated catalog. The 0.5.0 to 0.6.0 step replaces the source's
+# row trigger under a table lock that it holds to commit, so from every release
+# before 0.6.0 the writer waits and, after commit, reads the new bindings and is
 # captured. From 0.1.0 it may instead fail closed, if it reads the bindings
-# after the 0.2.0 step changes them and before that lock is taken.
+# after the 0.2.0 step changes them and before that lock is taken. From 0.6.0
+# the only step creates the delta table, which writers never touch, and the
+# write is captured at once.
 # The update stays open two seconds, so a writer that returns in under a second
 # did not wait.
 # unslop-ignore NO_SQL_INTERPOLATION -- CURRENT is checked as x.y.z above; ALTER EXTENSION takes no bind parameters.
@@ -156,6 +174,14 @@ case "$FROM:$DURING" in
 0.1.0:closed)
     expect "write during the update rolled back" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "60"
     DURING_EVENTS=0
+    ;;
+0.6.0:captured)
+    if [ "$WAITED" -ge 1000 ]; then
+        echo "upgrade check failed: a capture write waited ${WAITED} ms for the update" >&2
+        exit 1
+    fi
+    expect "write during the update" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "160"
+    DURING_EVENTS=1
     ;;
 *:captured)
     if [ "$WAITED" -lt 1000 ]; then
@@ -210,8 +236,9 @@ expect "drain" "$(q upgraded "SELECT applied||','||pruned FROM syntra_apply_prun
 expect "drained lag" "$(q upgraded "SELECT pending_events FROM syntra_capture_lag('feed')")" "0"
 expect "headroom" "$(q upgraded "SELECT retained_events||','||live_rows FROM syntra_capture_headroom('feed')")" "0,100"
 expect "drained read" "$(q upgraded "$READ")" "checkpoint:true"
-# The drain changed a few rows per partition, so it wrote partition deltas.
-expect "partition deltas" "$(q upgraded "SELECT count(*)>0 FROM syntra.capture_chunks WHERE delta IS NOT NULL")" "t"
+# The drain changed a few rows per partition, so it appended partition deltas
+# and moved the ones it replaced out of their chunk rows.
+expect "partition deltas" "$(q upgraded "SELECT count(*)>0 FROM syntra.capture_chunk_deltas")" "t"
 expect "stop" "$(q upgraded "SELECT syntra_stop_capture('feed')")" "t"
 q upgraded "SELECT syntra_seed_capture('feed','id','v',64)" >/dev/null
 q upgraded "UPDATE feed SET v=1 WHERE id=1"
