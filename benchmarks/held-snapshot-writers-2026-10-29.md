@@ -208,3 +208,25 @@ settle whether the late captured rise moved. Outside it, the captured table
 stayed within about 1.5 ms of plain to round 39, and round 40 rose to 392 ms.
 No transaction failed and both sums matched. A rerun on an idle machine is
 needed.
+
+### Rerun on a quiet machine
+
+Rerun from 19:43 with a load log beside it
+(`benchmarks/results/hold-control-cycle-int4-060-quiet-2026-10-29.log` and
+`.load.txt`; the 1-minute load average peaked at 11.5):
+
+| Round | Horizon age | Plain ms | Captured ms (0.6.0) | Captured ms (0.5.0) |
+|---|---|---|---|---|
+| 5 | ~20,000 | 7.4 | 8.8 | 9.0 |
+| 15 | ~60,000 | 11.3 | 12.2 | 9.6 |
+| 30 | ~120,000 | 14.2 | 13.9 | 12.1 |
+| 35 | ~139,000 | 14.6 | 14.9 | 19.2 |
+| 36 | ~143,000 | 15.3 | 15.5 | 45.9 |
+| 40 | ~159,000 | 15.6 | 16.3 | 39.5 |
+
+The captured table stayed within 2.2 ms of plain in every round, and within
+0.8 ms from round 20 on. Its rise follows the plain table's, which is
+PostgreSQL's own cost of reusing keys under the held snapshot. On 0.5.0 the
+captured table left plain from about 120,000. No transaction failed and both
+sums matched. This control has no readers and no applier contention beyond
+the maintenance worker, so it shows the writer path only. One run.
