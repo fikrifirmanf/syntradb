@@ -101,5 +101,85 @@ the two-hour soak; the soak must hold writer speed past an age of 89,000 before
 the slowdown counts as fixed.
 It did not: the two-hour soak on 0.5.0 still slowed from about the same age
 ([0.5.0 soak](../docs/checkpoint-soak.md#two-hour-hold-on-050-int4-2026-10-29)).
-The control has no readers, so the remaining cost is likely tied to the soak's
-readers, appliers or pruner, which these runs did not isolate.
+The runs below look for the remaining cost.
+
+## 0.5.0: what still slows the soak
+
+### Readers and cache size ruled out
+
+Two one-hour soaks on 0.5.0 held the snapshot for 30 minutes with the
+repeatable-read reader, the read-committed reader and the keyed monitor removed
+(`--checkpoint-soak-skip`). One used the default 128 MB `shared_buffers`, the
+other 1 GB (new `--shared-buffers-mb` option). Both end with `checkpoint stress
+did not exercise pruning, keyed checks and vacuum`, because the keyed monitor is
+skipped; the logs carry `.FAILED-no-keyed-checks-by-design`.
+
+| Horizon age | Writes per minute, 128 MB | Writes per minute, 1 GB |
+|---|---|---|
+| about 46,000 | 1,636 | 1,637 |
+| about 93,000 | 1,595 | 1,636 |
+| about 121,000 | 1,279 | 1,376 |
+| about 125,000 | 837 | 876 |
+| released | 1,633 | 1,633 |
+
+Writers slowed at the same ages as in the full two-hour soak (798 a minute at
+125,000), with or without readers, and with eight times the buffer cache.
+
+### Stack samples
+
+`benchmarks/scripts/soak-sample.sh` ran macOS `sample` on the pruner, the first
+writer and the first applier for 10 seconds at minutes 8, 20, 26 and 29 of the
+1 GB run (`results/soak-samples-noreaders-sb1g-050-2026-10-29/`). The harness
+now names each soak backend by its actor in `application_name`.
+
+At minute 29 the writer's samples, outside the time spent waiting for its client:
+
+| Where | Samples |
+|---|---|
+| Waiting for another transaction's lock on the feed head row (`heap_lock_tuple` under the capture trigger's `FOR NO KEY UPDATE`) | 2,221 |
+| Walking dead versions of source rows in its own statements | about 890 |
+| Walking versions of the head row inside the lock statement | 307 |
+| Walking versions in the trigger's native scan of marks | 166 |
+
+The applier spent 685 samples waiting for the same lock in its prune `UPDATE`
+of the head row. The pruner was idle 99% of the time: with combined
+maintenance the appliers prune too, so its falling commit count is a symptom.
+
+The capture trigger locks the head row and keeps the lock to commit, so that
+event ordinals stay gap-free and follow commit order. Captured transactions
+therefore take the lock one at a time, each for the rest of its transaction:
+the soak writer's transfer takes it, then the insert, key move, delete and
+commit, four client round trips, run under it.
+
+### The soak writer's statements on a plain table
+
+`hold-control.sh 40 30 55 cycle` repeats the control with the soak writer's
+statements: the two-row transfer, then insert a per-client key, move it and
+delete it, reusing the same keys every cycle. The rate is the two soak writers'
+combined 55 transactions per second
+(`results/hold-control-cycle-int4-050-2026-10-29.log`).
+
+| Round | Horizon age | Plain | Captured |
+|---|---|---|---|
+| 1 | 2,000 | 3.4 ms | 5.7 ms |
+| 10 | 40,000 | 9.6 ms | 11.8 ms |
+| 20 | 80,000 | 13.4 ms | 12.6 ms |
+| 30 | 120,000 | 12.0 ms | 12.1 ms |
+| 35 | 140,000 | 12.5 ms | 19.2 ms |
+| 40 | 159,000 | 12.1 ms | 39.5 ms |
+
+No transaction failed and both tables ended with matching sums. The plain table
+slowed 3.5 times: reusing keys under a held snapshot walks their dead versions,
+which PostgreSQL pays without SyntraDB. The captured table followed it to an
+age of about 120,000 and then rose faster. The soak, which adds two appliers
+taking the same lock, slowed from about 90,000.
+
+### Reading
+
+The evidence fits one mechanism: every captured transaction and every prune
+holds the head-row lock in turn, and a held snapshot makes each holder slower,
+partly through PostgreSQL's own dead versions and partly through the head row
+and marks. Once the summed hold time nears one second per second the queue
+grows and writers miss their arrivals. Faster lookups would move the point;
+only a shorter hold, or no shared lock, would remove the queue. One laptop and
+one run of each.

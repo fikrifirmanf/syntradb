@@ -4,10 +4,14 @@
 # paced two-row transfers in alternating rounds while one repeatable-read
 # session holds an old snapshot. The maintenance worker drains the captured
 # feed. Prints per-round tps and dead tuples for each table.
+# SHAPE "cycle" adds the soak writer's statements after the transfer: insert a
+# per-client key, move it, delete it. Every cycle reuses the same keys.
 set -euo pipefail
 ROUNDS="${1:-20}"
 SECONDS_PER_ROUND="${2:-30}"
 RATE="${3:-200}"
+SHAPE="${4:-transfer}"
+case "$SHAPE" in transfer | cycle) ;; *) echo "shape must be transfer or cycle" >&2; exit 2 ;; esac
 SYNTRA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$SYNTRA_ROOT"
 bash scripts/setup-production.sh >/dev/null
@@ -45,8 +49,17 @@ for t in plain captured; do
 BEGIN;
 UPDATE $t SET v = v - 1 WHERE id = :a;
 UPDATE $t SET v = v + 1 WHERE id = :b;
-COMMIT;
 EOF
+    if [[ "$SHAPE" == cycle ]]; then
+        cat >>"$WORK/$t.sql" <<EOF
+\set temporary 10001 + :client_id
+\set moved :temporary + 2
+INSERT INTO $t(id, v) VALUES (:temporary, NULL);
+UPDATE $t SET id = :moved WHERE id = :temporary;
+DELETE FROM $t WHERE id = :moved;
+EOF
+    fi
+    echo "COMMIT;" >>"$WORK/$t.sql"
 done
 # The holder keeps one snapshot open for the whole run.
 "$BIN/psql" -h "$SOCKET" -p "$PORT" -U hold -d feeds -AtqX \
