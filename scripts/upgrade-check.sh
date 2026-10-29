@@ -86,7 +86,9 @@ if [[ "$FROM" == 0.4.0 ]]; then
     # and reads replay before the update. Only trusted reuse needs the new column.
     q upgraded "UPDATE feed SET v=0 WHERE id=1"
     BEFORE_EVENTS=1
+    # unslop-ignore NO_SQL_INTERPOLATION -- READ is the constant query defined above.
     expect "read before the update" "$(q upgraded "$READ")" "replay:true"
+    # unslop-ignore NO_SQL_INTERPOLATION -- LIVE is the constant query defined above.
     expect "trusted read before the update" "$(q upgraded "$LIVE" | cut -d: -f1,2)" "heap:metadata_unavailable"
 elif [[ "$FROM" == 0.3.0 ]]; then
     # 0.4.0 changes only checkpoint storage. Capture writes keep the 0.3.0 event

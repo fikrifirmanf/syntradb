@@ -121,6 +121,7 @@ expect "early counters unchanged" "$(q downgraded "SELECT p.generation_vector=t.
 
 # unslop-ignore NO_SQL_INTERPOLATION -- OLD is a literal; ALTER EXTENSION takes no bind parameters.
 q downgraded "ALTER EXTENSION syntradb UPDATE TO '$OLD'"
+# unslop-ignore NO_SQL_INTERPOLATION -- constant SQL; OLD is only the expected value.
 expect "version" "$(q downgraded "SELECT extversion FROM pg_extension WHERE extname='syntradb'")" "$OLD"
 expect "kept projections" "$(q downgraded "SELECT string_agg(source_relation::regclass::text,',' ORDER BY 1) FROM syntra.trusted_int4_projections")" "plain"
 # The 0.5.0 library is still loaded; it must not publish a captured projection now.
@@ -168,6 +169,7 @@ q downgraded "$FINGERPRINT" >"$WORK/upgraded.catalog"
 q fresh_current "$FINGERPRINT" >"$WORK/fresh_current.catalog"
 if ! diff -u "$WORK/fresh_current.catalog" "$WORK/upgraded.catalog" >"$WORK/current.diff"; then
     cat "$WORK/current.diff" >&2
+    # unslop-ignore NO_SQL_INTERPOLATION -- an error message, not SQL.
     echo "downgrade check failed: catalog after the second update differs from a fresh $CURRENT install" >&2
     exit 1
 fi
