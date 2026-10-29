@@ -230,3 +230,42 @@ PostgreSQL's own cost of reusing keys under the held snapshot. On 0.5.0 the
 captured table left plain from about 120,000. No transaction failed and both
 sums matched. This control has no readers and no applier contention beyond
 the maintenance worker, so it shows the writer path only. One run.
+
+## 0.6.0: what slows the soak now
+
+A one-hour soak on 0.6.0 with a 30-minute hold was sampled at minutes 8, 20
+and 28 (`benchmarks/scripts/soak-sample.sh`, 15 s each; samples in
+`benchmarks/results/soak-samples-060-2026-10-29/`, soak log
+`benchmarks/results/checkpoint-soak-1h-int4-060-sampled-2026-10-29.FAILED-missed-arrivals.log`).
+The soak failed the missed-arrival limit on the repeatable-read reader, which
+missed 9,861 of 108,000 offered arrivals; each writer missed about 2,500 (2.4%)
+and no invariant failed.
+
+At minute 28 (horizon age about 125,000):
+
+- **Writer.** Of about 8,700 busy samples, about 7,300 were the writer's own
+  statements on the source, mostly unique-index insertion that walks dead
+  versions of reused keys, which PostgreSQL pays without SyntraDB. Commit-time
+  capture took 1,437. Waits on the head-row lock, 2,221 samples on 0.5.0, were
+  149.
+- **Applier.** About 4,860 of its 5,000 busy samples were in
+  `checkpoint::chunks::persist`, in the delta `UPDATE` of
+  `syntra.capture_chunks`. Half went to finding the rows, a nested loop over a
+  bitmap heap scan that visits every version of each partition row the
+  snapshot keeps; half to index insertion, whose unique check fetches those
+  versions again. The update is never HOT, because `revision` is in
+  `capture_chunks_version_index` and changes on every write. Each apply
+  therefore costs more as the hold ages and holds the maintenance lock longer.
+- **Pruner.** Idle: its attempts are refused at once while an apply holds the
+  maintenance lock.
+
+At minute 8 the applier and pruner were idle nearly all the time.
+
+Taking the head lock at commit removed the writer queue that 0.5.0 showed.
+What is left is PostgreSQL's own cost on the source table, and apply time that
+grows with the versions of the chunk rows it updates. That second cost blocks
+pruning, so history that is not folded stays in the tables writers read. A
+layout that appends chunk deltas instead of updating one row per partition,
+as `capture_marks` did for the head row, would remove the apply growth; how
+much of the writer slowdown it would recover is not measured, and the bench
+has no capture-off soak to separate PostgreSQL's share.
