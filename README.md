@@ -171,10 +171,11 @@ synchronization and recovery rules.
 
 Use the [managed projection API](docs/managed-projections.md) for named snapshots.
 Run `bash scripts/recovery-checks.sh` for [crash and restore checks](docs/recovery.md).
-Run `bash scripts/upgrade-check.sh` to [upgrade 0.1.0, 0.2.0 and 0.3.0 databases](docs/upgrades.md)
-with captured history and compare it with a fresh install.
-Run `bash scripts/downgrade-check.sh` to [downgrade 0.4.0 to 0.3.0](docs/upgrades.md#040-to-030-downgrade)
-and update again.
+Run `bash scripts/upgrade-check.sh [0.1.0|0.2.0|0.3.0|0.4.0]` to [upgrade older databases](docs/upgrades.md)
+with captured history and compare them with a fresh install.
+Run `bash scripts/downgrade-0.5.0-check.sh` to [downgrade 0.5.0 to 0.4.0](docs/upgrades.md#050-to-040-downgrade)
+and `bash scripts/downgrade-check.sh` to [downgrade 0.4.0 to 0.3.0](docs/upgrades.md#040-to-030-downgrade),
+each updating again afterwards.
 Run `bash scripts/physical-restore-check.sh [int2|int4|int8|numeric] [writers] [feeds]` for a base backup and
 [point-in-time restore](docs/recovery.md#physical-backup-and-point-in-time-restore)
 with captured history pending.
