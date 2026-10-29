@@ -593,3 +593,12 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   a captured update from 0.4 to 6.3 ms at 80,000 versions each; adding them to
   the head row did not. See
   [the findings](../benchmarks/held-snapshot-writers-2026-10-29.md).
+- **0.5.0 tracking change.** Statements on a captured source no longer update a
+  statement-tracking counter row; trusted reuse compares the feed position
+  instead. The full check passed with 185 PostgreSQL tests, upgrades from
+  0.1.0 through 0.4.0 to 0.5.0 passed, and both downgrade checks passed. Five
+  planted bugs failed a check, including a reader that ignored the position and
+  a downgrade that kept projections from captured sources. See
+  [upgrades](upgrades.md#040-to-050). Rerun on 0.5.0, the held-snapshot control
+  kept captured transfers between 2.5 and 4.3 ms to 500,000 dead rows, against
+  2.4 s on 0.4.0. The two-hour soak on 0.5.0 has not finished.
