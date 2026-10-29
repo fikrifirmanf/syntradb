@@ -66,7 +66,7 @@ were not isolated.
 
 The counter rows exist for statement tracking, which trusted reuse compares as
 a 16-entry version vector. Removing their updates needs a new tracking format
-and an upgrade path that keeps reuse correct, which is a larger change than this
-note covers. Until then the snapshot age policy in
+and an upgrade path that keeps reuse correct; the options are in
+[a proposal](../docs/tracking-counter-proposal.md). Until then the snapshot age policy in
 [resource bounds](../docs/resource-bounds.md#snapshot-age-policy) stands: page at
 an age of 10,000, well below where writers slowed.
