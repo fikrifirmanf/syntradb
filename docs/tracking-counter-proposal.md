@@ -1,6 +1,8 @@
 # Proposal: stop updating counter rows on every write
 
-Status: proposal, not implemented. Nothing here changes 0.4.0.
+Status: option A is implemented in 0.5.0; see
+[upgrades](upgrades.md#040-to-050). The rest is kept as the record of the
+decision.
 
 ## Problem
 

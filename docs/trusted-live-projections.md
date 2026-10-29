@@ -34,7 +34,10 @@ caller's exact active MVCC snapshot. Reads use native indexed catalog scans;
 they do not run SPI statements that could advance the command snapshot.
 
 Reuse requires matching database, cluster, source, attribute, type and storage
-identities. The epoch and every counter must also match. Current native catalog
+identities. The epoch and every counter must also match. For a captured source,
+whose writers leave the counters alone since 0.5.0, the feed position read at the
+same snapshot must match the one stored at publication; ordinals follow commit
+order, so every committed row change moves it. Current native catalog
 checks require the source statement guard and both unrestricted DDL guards to
 be enabled ALWAYS. Missing metadata, changed bindings and damaged bytes cause
 heap fallback. Segment validation runs before aggregation or group pruning.

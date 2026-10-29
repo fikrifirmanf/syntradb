@@ -200,12 +200,74 @@ passed with an 81 ms wait, and a guard that matched `money` instead of
 Only this one step back has a script. Going below 0.3.0 would need a script
 that undoes the 0.3.0 rewrite of the capture tables, and there is none.
 
+## 0.4.0 to 0.5.0
+
+0.5.0 writers to a captured source stop updating its statement-tracking counter
+rows. A held snapshot kept every version of those rows, and each write walked
+them ([findings](../benchmarks/held-snapshot-writers-2026-10-29.md)). Trusted
+reuse of a captured source now compares its feed position, which changes with
+every committed row change. See the [proposal](tracking-counter-proposal.md),
+option A.
+
+The script adds a nullable `capture_position` column to
+`syntra.trusted_int4_projections`. Existing projections get NULL, which matches
+a source that is only tracked and never matches a captured one, so captured
+projections fall back to the heap until they are published again.
+
+`syntra_source_tracking_status` no longer counts statements on a captured
+source; its `generation` stays where seeding left it until capture is retired.
+
+Install the library, restart or end every session that loaded 0.4.0, then run
+`ALTER EXTENSION syntradb UPDATE`. Capture writes neither fail nor wait: the
+update locks only the trusted catalog. Between the restart and the update,
+capture, maintenance and checkpoint reads work as on 0.4.0, and every trusted
+read falls back to the heap with `metadata_unavailable`, because the library
+cannot find the new column.
+
+## 0.5.0 to 0.4.0 (downgrade)
+
+0.4.0 reuses a projection whose counters match, and 0.5.0 stopped moving them
+for captured sources. With the 0.5.0 library still installed:
+
+1. Run `ALTER EXTENSION syntradb UPDATE TO '0.4.0'`. The script deletes every
+   trusted projection of a captured source, including those published before
+   0.5.0, and adds a check that keeps `capture_position` NULL, so the 0.5.0
+   library cannot publish another before the restart. Projections of sources
+   that are only tracked stay.
+2. Install the 0.4.0 library, then restart or end every session that loaded
+   0.5.0.
+
+The column stays, NULL in every row, for the reason the `delta` column stays
+in the 0.4.0 downgrade. A later update to 0.5.0 drops the extra check.
+Captured sources need `syntra_publish_trusted_int4` again after the downgrade.
+
+`scripts/downgrade-0.5.0-check.sh` creates three sources on 0.4.0: a captured
+one published only on 0.4.0, a captured one published again on 0.5.0, and one
+that is only tracked. It updates to 0.5.0, writes to all three, downgrades and
+restarts on 0.4.0, then checks that:
+
+- the downgrade keeps only the tracked-only projection, and the 0.5.0 library
+  is refused when it tries to publish a captured one;
+- on 0.4.0 neither captured source is reused, the tracked-only one is, and new
+  writes invalidate projections published there;
+- history captured on 0.5.0 applies on 0.4.0 and reads back exactly;
+- the catalog matches a fresh 0.4.0 install apart from the kept column and its
+  two checks, and after a second update matches a fresh 0.5.0 install.
+
+One run passed (`benchmarks/results/downgrade-0.5.0-check-2026-10-29.log`). A
+downgrade script that removed only projections with a stored position kept the
+one published on 0.4.0, and the check failed.
+
+`scripts/downgrade-check.sh` still checks 0.4.0 to 0.3.0, now building 0.4.0
+from its archived source; it passed again.
+
 ## Upgrade check
 
 ```sh
 bash scripts/upgrade-check.sh          # from 0.1.0
 bash scripts/upgrade-check.sh 0.2.0    # from 0.2.0
 bash scripts/upgrade-check.sh 0.3.0    # from 0.3.0
+bash scripts/upgrade-check.sh 0.4.0    # from 0.4.0
 ```
 
 The check builds the archived source
@@ -224,6 +286,9 @@ swaps in the new library and checks that:
 - the checkpoint read replays the old history and matches the heap exactly;
 - new writes, apply and prune, lag and status counts, headroom, stop and reseed
   work;
+- a trusted projection published on the old release, after its last write, is
+  not reused after the update and captured writes, and a projection published
+  again is, until the next captured write;
 - an `int8` feed seeded after the update replays and checkpoints a sum past the
   `bigint` range;
 - the drain after the update writes partition deltas, and the drained feed reads
@@ -235,7 +300,11 @@ swaps in the new library and checks that:
 `scripts/upgrade-scale-check.sh` takes the starting version as a fourth argument
 (default 0.1.0). On 2026-10-28 the check passed from 0.1.0, 0.2.0 and 0.3.0 to
 0.4.0, with 500 catalog entries identical to a fresh install
-(`benchmarks/results/upgrade-check-0.4.0-2026-10-28.log`).
+(`benchmarks/results/upgrade-check-0.4.0-2026-10-28.log`). On 2026-10-29 it
+passed from 0.1.0, 0.2.0, 0.3.0 and 0.4.0 to 0.5.0, with 506 entries
+(`benchmarks/results/upgrade-check-0.5.0-2026-10-29.log`). A reader that treated
+a projection with no stored position as matching served the stale 0.4.0
+projection after captured writes, and the check failed.
 
 ## Upgrade under load
 

@@ -79,6 +79,13 @@ that case. Storage identity alone never proves unchanged contents or freshness.
 
 ## Counter shards and cost
 
+Since 0.5.0, writes to a captured source skip the counter update. Its feed
+already records every committed row change, and trusted reuse compares the feed
+position instead ([upgrades](upgrades.md#040-to-050)). Under a held snapshot,
+every update of a counter row walked the versions the snapshot kept
+([findings](../benchmarks/held-snapshot-writers-2026-10-29.md)). The status
+call's `generation` therefore stops counting while capture is installed.
+
 Each source now has sixteen counter shards. The full transaction ID selects one
 shard. A statement updates only that row, while the source registry remains read
 only during DML. Transactions can still collide on a shard. This reduces the
