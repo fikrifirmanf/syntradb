@@ -724,6 +724,46 @@ pub(super) fn position(
     Some((row.get(3, "ordinal")?, row.get(4, "live_rows")?))
 }
 
+/// The feed position seen at `snapshot`, when the source is captured in tracking
+/// epoch `tracking_epoch`; None when it is not. Seeding and retirement each start
+/// a new tracking epoch, so within one epoch every committed row change appends
+/// a mark. Ordinals follow commit order, so a snapshot sees a prefix of them and
+/// the position changes with every committed change it can see.
+pub(super) fn feed_position(
+    source: &PgRelation,
+    snapshot: pg_sys::Snapshot,
+    tracking_epoch: i64,
+) -> Result<Option<i64>, &'static str> {
+    let mut scan = CatalogScan::open(
+        c"syntra",
+        c"capture_heads",
+        c"capture_heads_pkey",
+        snapshot,
+        &[oid_key(1, "source_relation", source.oid())],
+    )
+    .ok_or("metadata_unavailable")?;
+    let Some(row) = scan.next() else {
+        return Ok(None);
+    };
+    if row.get::<i64>(3, "tracking_epoch") != Some(tracking_epoch) {
+        return Ok(None);
+    }
+    let (Some(epoch), Some(emitted), Some(rows)) = (
+        row.get::<i64>(2, "epoch"),
+        row.get::<i64>(9, "emitted"),
+        row.get::<i64>(16, "live_rows"),
+    ) else {
+        return Err("metadata_invalid");
+    };
+    if scan.next().is_some() {
+        return Err("metadata_invalid");
+    }
+    drop(scan);
+    position(source, snapshot, epoch, emitted, rows)
+        .map(|(position, _)| Some(position))
+        .ok_or("metadata_invalid")
+}
+
 #[pg_trigger]
 fn syntra_capture_row<'a>(
     trigger: &'a PgTrigger<'a>,

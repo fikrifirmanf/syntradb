@@ -1519,7 +1519,7 @@ dependencies = [
 
 [[package]]
 name = "syntra-bench"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "hdrhistogram",
  "postgres",
@@ -1531,11 +1531,11 @@ dependencies = [
 
 [[package]]
 name = "syntra-core"
-version = "0.4.0"
+version = "0.5.0"
 
 [[package]]
 name = "syntra-exec"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "syntra-core",
  "syntra-storage",
@@ -1543,7 +1543,7 @@ dependencies = [
 
 [[package]]
 name = "syntra-pg"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "pgrx",
  "pgrx-tests",
@@ -1555,7 +1555,7 @@ dependencies = [
 
 [[package]]
 name = "syntra-storage"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "crc32fast",
  "sha2",

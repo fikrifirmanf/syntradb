@@ -353,7 +353,8 @@ fn run(options: &Options) -> Result<Value> {
         runner_source_fingerprint,
     )?;
     let snapshot_checks = checks::snapshot_checks(&cluster, &mut enabled)?;
-    let trusted_checks = trusted_checks::run(&cluster)?;
+    let mut trusted_checks = trusted_checks::run(&cluster)?;
+    trusted_checks.extend(trusted_checks::run_captured(&cluster)?);
     let capture_checks = capture_checks::run(&cluster)?;
     let checkpoint_checks = checkpoint_checks::run(&cluster)?;
     let tail_checks = tail_checks::run(&cluster)?;

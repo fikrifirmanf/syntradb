@@ -12,13 +12,26 @@ fn require(value: bool, message: &'static str) -> Result<()> {
 }
 
 fn check(client: &mut Client, route: &str, reason: &str, sum: Option<i64>) -> Result<()> {
+    check_table(client, "trusted_check", route, reason, sum)
+}
+
+fn check_table(
+    client: &mut Client,
+    table: &str,
+    route: &str,
+    reason: &str,
+    sum: Option<i64>,
+) -> Result<()> {
+    // The table name is one of this module's fixed fixtures.
     let row = client.query_one(
-        r#"SELECT s.route, s.reason, s.sum,
+        &format!(
+            r#"SELECT s.route, s.reason, s.sum,
         ROW(s.rows,s.non_nulls,s.sum,s.min,s.max) IS NOT DISTINCT FROM
         ROW(n.rows,n.non_nulls,n.sum,n.min,n.max)
-        FROM syntra_live_int4_summary('trusted_check','v') AS s,
+        FROM syntra_live_int4_summary('{table}','v') AS s,
         (SELECT count(*) AS rows,count(v) AS non_nulls,sum(v),min(v),max(v)
-         FROM trusted_check) AS n LIMIT 1"#,
+         FROM {table}) AS n LIMIT 1"#
+        ),
         &[],
     )?;
     let actual_route: &str = row.try_get(0)?;
@@ -260,5 +273,115 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         "publication isolation",
         "nonblocking publisher admission",
         "replica-mode source drop cleanup",
+    ])
+}
+
+/// A captured source's writers leave the counter rows alone, so reuse rests on
+/// the feed position. Every committed change must still invalidate, and
+/// maintenance that changes no data must not.
+pub(super) fn run_captured(cluster: &Cluster) -> Result<Vec<&'static str>> {
+    let mut reader = cluster.connect("syntra_enabled")?;
+    let mut writer = cluster.connect("syntra_enabled")?;
+    reader.batch_execute("CREATE TABLE trusted_captured(id int4 PRIMARY KEY,v int4); INSERT INTO trusted_captured(id,v) VALUES(1,10),(2,20),(3,NULL)")?;
+    reader.query_one(
+        "SELECT syntra_seed_capture('trusted_captured','id','v',64)",
+        &[],
+    )?;
+    let publish = |client: &mut Client| -> Result<()> {
+        client.query_one(
+            "SELECT syntra_publish_trusted_int4('trusted_captured','v')",
+            &[],
+        )?;
+        Ok(())
+    };
+    let counters = |client: &mut Client| -> Result<Vec<i64>> {
+        Ok(client
+            .query_one(
+                "SELECT generation_vector FROM syntra_source_tracking_status('trusted_captured')",
+                &[],
+            )?
+            .try_get(0)?)
+    };
+    let check = |client: &mut Client, route: &str, reason: &str, sum: Option<i64>| {
+        check_table(client, "trusted_captured", route, reason, sum)
+    };
+    publish(&mut reader)?;
+    check(&mut reader, "projection", "eligible", Some(30))?;
+    let stored: Option<i64> = reader.query_one("SELECT capture_position FROM syntra.trusted_int4_projections WHERE source_relation='trusted_captured'::regclass", &[])?.try_get(0)?;
+    require(
+        stored.is_some(),
+        "captured publication stored no feed position",
+    )?;
+
+    let before = counters(&mut reader)?;
+    writer.batch_execute("UPDATE trusted_captured SET v=11 WHERE id=1")?;
+    check(&mut reader, "heap", "version_changed", Some(31))?;
+    require(
+        counters(&mut reader)? == before,
+        "a captured write updated a counter row",
+    )?;
+    publish(&mut writer)?;
+    check(&mut reader, "projection", "eligible", Some(31))?;
+
+    // A statement that changes no rows leaves the data, and the position, as is.
+    writer.batch_execute("UPDATE trusted_captured SET v=0 WHERE false")?;
+    check(&mut reader, "projection", "eligible", Some(31))?;
+    writer.batch_execute("BEGIN; UPDATE trusted_captured SET v=99 WHERE id=2; ROLLBACK")?;
+    check(&mut reader, "projection", "eligible", Some(31))?;
+
+    // Inserts, deletes and key moves each invalidate.
+    for (change, sum) in [
+        ("INSERT INTO trusted_captured(id,v) VALUES(4,5)", 36),
+        ("DELETE FROM trusted_captured WHERE id=4", 31),
+        ("UPDATE trusted_captured SET id=5 WHERE id=2", 31),
+    ] {
+        writer.batch_execute(change)?;
+        check(&mut reader, "heap", "version_changed", Some(sum))?;
+        publish(&mut writer)?;
+        check(&mut reader, "projection", "eligible", Some(sum))?;
+    }
+
+    // Applying and pruning moves no data, so it must not invalidate.
+    writer.query_one(
+        "SELECT applied FROM syntra_apply_prune_capture('trusted_captured')",
+        &[],
+    )?;
+    check(&mut reader, "projection", "eligible", Some(31))?;
+
+    // A repeatable-read reader keeps the projection its snapshot saw.
+    reader.batch_execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")?;
+    check(&mut reader, "projection", "eligible", Some(31))?;
+    writer.batch_execute("UPDATE trusted_captured SET v=12 WHERE id=1")?;
+    publish(&mut writer)?;
+    check(&mut reader, "projection", "eligible", Some(31))?;
+    reader.batch_execute("COMMIT")?;
+    check(&mut reader, "projection", "eligible", Some(32))?;
+
+    // Retiring capture starts a new epoch, and writes count on the rows again.
+    writer.query_one("SELECT syntra_stop_capture('trusted_captured')", &[])?;
+    check(&mut reader, "heap", "epoch_changed", Some(32))?;
+    publish(&mut writer)?;
+    check(&mut reader, "projection", "eligible", Some(32))?;
+    let stored: Option<i64> = reader.query_one("SELECT capture_position FROM syntra.trusted_int4_projections WHERE source_relation='trusted_captured'::regclass", &[])?.try_get(0)?;
+    require(
+        stored.is_none(),
+        "a tracked-only publication stored a feed position",
+    )?;
+    let before = counters(&mut reader)?;
+    writer.batch_execute("UPDATE trusted_captured SET v=13 WHERE id=1")?;
+    check(&mut reader, "heap", "version_changed", Some(33))?;
+    require(
+        counters(&mut reader)? != before,
+        "a tracked-only write left the counter rows unchanged",
+    )?;
+    reader.batch_execute("DROP TABLE trusted_captured")?;
+    Ok(vec![
+        "captured publication stores the feed position",
+        "captured write invalidates without a counter update",
+        "captured empty statement and rollback keep reuse",
+        "captured insert, delete and key move invalidate",
+        "apply and prune keep reuse",
+        "captured repeatable-read historical cache",
+        "retired capture returns to counter rows",
     ])
 }

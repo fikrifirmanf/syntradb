@@ -111,7 +111,10 @@ CREATE TABLE syntra.trusted_int4_projections (
     generation_vector bigint[] NOT NULL CHECK (array_ndims(generation_vector)=1
         AND cardinality(generation_vector)=16 AND array_position(generation_vector,NULL) IS NULL),
     segment bytea NOT NULL CHECK (octet_length(segment) BETWEEN 40 AND 8388608),
-    PRIMARY KEY (source_relation,source_attribute)
+    PRIMARY KEY (source_relation,source_attribute),
+    -- 0.5.0: the feed position of a captured source at publication; NULL for a
+    -- source that is only tracked.
+    capture_position bigint CHECK (capture_position >= 0)
 );
 REVOKE ALL ON syntra.trusted_int4_projections FROM PUBLIC;
 -- Opt-in transactional capture. These tables are deliberately not config-dumped.

@@ -70,11 +70,25 @@ q upgraded "INSERT INTO feed VALUES(101,NULL)"
 # Retained events: 0.2.0 records new positions as marks, not on the head row.
 expect "$FROM pending events" "$(q upgraded "SELECT count(*) FROM syntra.capture_events")" "5"
 expect "$FROM read" "$(q upgraded "$READ")" "replay:true"
+# A trusted projection published on the old release, after its last write. 0.5.0
+# writers to a captured source stop moving its counter rows, so after the update
+# this projection's counters still match; it must not be reused.
+LIVE="SELECT s.route||':'||s.reason||':'||(s.sum IS NOT DISTINCT FROM n.sum)
+    FROM syntra_live_int4_summary('feed','v') AS s,(SELECT sum(v) FROM feed) AS n"
+q upgraded "SELECT syntra_publish_trusted_int4('feed','v')" >/dev/null
+expect "$FROM trusted read" "$(q upgraded "$LIVE")" "projection:eligible:true"
 stop
 
 install_from "$SYNTRA_ROOT" "$SYNTRA_ROOT/target/upgrade-current"
 start
-if [[ "$FROM" == 0.3.0 ]]; then
+if [[ "$FROM" == 0.4.0 ]]; then
+    # 0.5.0 keeps the 0.4.0 capture and checkpoint formats: writes are captured
+    # and reads replay before the update. Only trusted reuse needs the new column.
+    q upgraded "UPDATE feed SET v=0 WHERE id=1"
+    BEFORE_EVENTS=1
+    expect "read before the update" "$(q upgraded "$READ")" "replay:true"
+    expect "trusted read before the update" "$(q upgraded "$LIVE" | cut -d: -f1,2)" "heap:metadata_unavailable"
+elif [[ "$FROM" == 0.3.0 ]]; then
     # 0.4.0 changes only checkpoint storage. Capture writes keep the 0.3.0 event
     # format and are captured; maintenance fails closed until the update, and a
     # reader that cannot read the old chunk rows falls back to the heap.
@@ -101,8 +115,9 @@ fi
 # against a half-updated catalog. From 0.1.0 it fails closed: the 0.2.0 step
 # changes the bindings before the writer reads them. From 0.2.0 it waits: the
 # 0.3.0 step holds ACCESS EXCLUSIVE on capture_bindings, and after commit the
-# writer reads the new bindings and is captured. From 0.3.0 it is captured at
-# once: the 0.4.0 step locks only checkpoint tables, which writers never touch.
+# writer reads the new bindings and is captured. From 0.3.0 and 0.4.0 it is
+# captured at once: the 0.4.0 step locks only checkpoint tables and the 0.5.0
+# step only the trusted catalog, which writers never touch.
 # The update stays open two seconds, so a writer that returns in under a second
 # did not wait.
 # unslop-ignore NO_SQL_INTERPOLATION -- CURRENT is checked as x.y.z above; ALTER EXTENSION takes no bind parameters.
@@ -133,9 +148,9 @@ case "$FROM:$DURING" in
     expect "write during the update" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "160"
     DURING_EVENTS=1
     ;;
-0.3.0:captured)
+0.3.0:captured | 0.4.0:captured)
     if [ "$WAITED" -ge 1000 ]; then
-        echo "upgrade check failed: a capture write waited ${WAITED} ms for the 0.4.0 update" >&2
+        echo "upgrade check failed: a capture write waited ${WAITED} ms for the update" >&2
         exit 1
     fi
     expect "write during the update" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "160"
@@ -155,9 +170,15 @@ q upgraded "UPDATE feed SET v=v+5 WHERE id<=20"
 q upgraded "INSERT INTO feed VALUES(102,3)"
 q upgraded "DELETE FROM feed WHERE id=50"
 expect "mixed history" "$(q upgraded "$READ")" "replay:true"
+expect "old trusted projection after captured writes" "$(q upgraded "$LIVE")" "heap:version_changed:true"
+q upgraded "SELECT syntra_publish_trusted_int4('feed','v')" >/dev/null
+expect "republished trusted read" "$(q upgraded "$LIVE")" "projection:eligible:true"
+q upgraded "UPDATE feed SET v=v+1 WHERE id=2"
+expect "trusted read after a captured write" "$(q upgraded "$LIVE")" "heap:version_changed:true"
+q upgraded "UPDATE feed SET v=v-1 WHERE id=2"
 # 10 applied and 5 pending on $FROM, any write captured before or during the
-# update, then 22 more: 20 updates, an insert, a delete.
-PENDING=$((27 + BEFORE_EVENTS + DURING_EVENTS))
+# update, then 24 more: 22 updates, an insert, a delete.
+PENDING=$((29 + BEFORE_EVENTS + DURING_EVENTS))
 EMITTED=$((10 + PENDING))
 # unslop-ignore NO_SQL_INTERPOLATION -- constant SQL; the counts are only the expected value.
 expect "lag" "$(q upgraded "SELECT emitted||','||applied||','||pending_events FROM syntra_capture_lag('feed')")" "$EMITTED,10,$PENDING"

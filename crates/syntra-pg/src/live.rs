@@ -7,6 +7,9 @@ use syntra_exec::Int4Predicate;
 struct Version {
     epoch: i64,
     vector: Vec<i64>,
+    /// The feed position of a captured source, whose writers leave the counter
+    /// rows alone; None for a source that is only tracked.
+    position: Option<i64>,
 }
 
 fn trackable(source: &PgRelation) -> bool {
@@ -98,7 +101,13 @@ fn version(source: &PgRelation, snapshot: pg_sys::Snapshot) -> Result<Version, &
     if count != 16 {
         return Err("metadata_invalid");
     }
-    Ok(Version { epoch, vector })
+    drop(scan);
+    let position = crate::capture::feed_position(source, snapshot, epoch)?;
+    Ok(Version {
+        epoch,
+        vector,
+        position,
+    })
 }
 
 fn keys(source: &PgRelation, attribute: i16) -> [Key; 2] {
@@ -146,6 +155,19 @@ fn cached(
         .and_then(|v| v.into_iter().collect::<Option<Vec<_>>>())
         .ok_or("metadata_invalid")?;
     if vector != version.vector {
+        return Err("version_changed");
+    }
+    // A catalog without the column, before the 0.5.0 update, cannot say which
+    // position a projection was published at.
+    let position = if row.is_null(8, "capture_position", pg_sys::INT8OID) {
+        None
+    } else {
+        Some(
+            row.get::<i64>(8, "capture_position")
+                .ok_or("metadata_unavailable")?,
+        )
+    };
+    if position != version.position {
         return Err("version_changed");
     }
     // SAFETY: backend initialized database identity, copied by value.
@@ -330,17 +352,18 @@ fn syntra_publish_trusted_int4(source: PgRelation, column: &str) -> i64 {
     let database = unsafe { pg_sys::MyDatabaseId };
     let inserted = Spi::get_one_with_args::<i64>(r#"WITH published AS (
         INSERT INTO syntra.trusted_int4_projections
-        (source_relation,source_attribute,source_database,source_identity,epoch,generation_vector,segment)
-        SELECT $1,$2,$3,$4,$5,$6,$7
+        (source_relation,source_attribute,source_database,source_identity,epoch,generation_vector,segment,capture_position)
+        SELECT $1,$2,$3,$4,$5,$6,$7,$8
         WHERE EXISTS (SELECT source_relation FROM syntra.trusted_int4_projections
             WHERE source_relation=$1 AND source_attribute=$2)
             OR (SELECT count(*) FROM syntra.trusted_int4_projections) < 64
         ON CONFLICT (source_relation,source_attribute) DO UPDATE SET
             source_database=EXCLUDED.source_database,source_identity=EXCLUDED.source_identity,
-            epoch=EXCLUDED.epoch,generation_vector=EXCLUDED.generation_vector,segment=EXCLUDED.segment
+            epoch=EXCLUDED.epoch,generation_vector=EXCLUDED.generation_vector,segment=EXCLUDED.segment,
+            capture_position=EXCLUDED.capture_position
         RETURNING source_relation) SELECT count(*) FROM published"#,
         &[source.oid().into(),attribute.into(),database.into(),identity.as_str().into(),
-            version.epoch.into(),version.vector.into(),bytes.into()])
+            version.epoch.into(),version.vector.into(),bytes.into(),version.position.into()])
         .unwrap_or_else(|e| pgrx::error!("{}",e));
     if inserted != Some(1) {
         pgrx::ereport!(

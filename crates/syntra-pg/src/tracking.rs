@@ -20,6 +20,12 @@ fn syntra_source_changed<'a>(
         .relid()
         .unwrap_or_else(|error| pgrx::error!("{}", error));
     let trigger_oid = trigger.trigger().tgoid;
+    // A captured source's feed records every committed row change, and trusted
+    // reuse compares its position instead. Updating a counter row here would add
+    // a version that a held snapshot keeps and every later update walks.
+    if captured(relation, trigger_oid) {
+        return Ok(None);
+    }
     // SAFETY: this runs inside a source statement on the backend main thread.
     // Counter writes need an assigned XID even for a source statement with no
     // changed rows. The bounded modulo result fits int2. No backend is shared.
@@ -34,6 +40,46 @@ fn syntra_source_changed<'a>(
         );
     }
     Ok(None)
+}
+
+/// True when this trigger is the source's current registration and the source is
+/// captured in its current tracking epoch, both read at a latest snapshot as the
+/// capture row trigger reads them. Any doubt counts as not captured, which keeps
+/// the counter update.
+fn captured(relation: pg_sys::Oid, trigger: pg_sys::Oid) -> bool {
+    // SAFETY: the firing statement already holds a lock on its source.
+    let source = unsafe { PgRelation::with_lock(relation, pg_sys::AccessShareLock as i32) };
+    let _latest = crate::capture::Snapshot::latest();
+    // SAFETY: the guard above pins this MVCC snapshot through both scans.
+    let snapshot = unsafe { pg_sys::GetActiveSnapshot() };
+    let Some(mut registry) = crate::native_catalog::CatalogScan::open(
+        c"syntra",
+        c"tracked_sources",
+        c"tracked_sources_pkey",
+        snapshot,
+        &[crate::native_catalog::oid_key(
+            1,
+            "source_relation",
+            relation,
+        )],
+    ) else {
+        return false;
+    };
+    let Some(row) = registry.next() else {
+        return false;
+    };
+    let (Some(registered), Some(epoch)) = (
+        row.get::<pg_sys::Oid>(2, "trigger_oid"),
+        row.get::<i64>(3, "epoch"),
+    ) else {
+        return false;
+    };
+    drop(registry);
+    registered == trigger
+        && matches!(
+            crate::capture::feed_position(&source, snapshot, epoch),
+            Ok(Some(_))
+        )
 }
 
 /// Admin-only setup acquires an exclusive source lock before installing a typed

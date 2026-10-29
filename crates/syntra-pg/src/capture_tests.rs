@@ -125,7 +125,9 @@ fn capture_retirement_preserves_source_and_statement_tracking() {
         Spi::get_one::<i32>("SELECT v FROM capture_retire LIMIT 1").unwrap(),
         Some(3)
     );
-    assert_eq!(Spi::get_one::<bool>("SELECT guard_config_valid AND generation=2 AND NOT EXISTS(SELECT epoch FROM syntra.capture_heads WHERE source_relation='capture_retire'::regclass) AND NOT EXISTS(SELECT ordinal FROM syntra.capture_events WHERE source_relation='capture_retire'::regclass) AND NOT EXISTS(SELECT key FROM syntra.capture_base_rows WHERE source_relation='capture_retire'::regclass) FROM syntra_source_tracking_status('capture_retire') LIMIT 1").unwrap(),Some(true));
+    // Since 0.5.0 the captured update leaves the counter rows alone; only the
+    // update after retirement counts.
+    assert_eq!(Spi::get_one::<bool>("SELECT guard_config_valid AND generation=1 AND NOT EXISTS(SELECT epoch FROM syntra.capture_heads WHERE source_relation='capture_retire'::regclass) AND NOT EXISTS(SELECT ordinal FROM syntra.capture_events WHERE source_relation='capture_retire'::regclass) AND NOT EXISTS(SELECT key FROM syntra.capture_base_rows WHERE source_relation='capture_retire'::regclass) FROM syntra_source_tracking_status('capture_retire') LIMIT 1").unwrap(),Some(true));
     Spi::run("TRUNCATE capture_retire").unwrap();
     assert_eq!(
         Spi::get_one::<i64>("SELECT count(*) FROM capture_retire").unwrap(),

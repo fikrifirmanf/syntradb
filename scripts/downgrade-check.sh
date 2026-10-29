@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Downgrade a live database from the current release (0.4.0) to 0.3.0 and back:
+# Downgrade a live database from 0.4.0 to 0.3.0 and back, both built from their
+# archived sources (the workspace is newer; see downgrade-0.5.0-check.sh):
 # create on 0.3.0, update to 0.4.0, write partition deltas, fold them, update to
 # 0.3.0 while the 0.4.0 library is installed, install the 0.3.0 library and restart.
 # The downgraded catalog must match a fresh 0.3.0 install, history captured on
@@ -12,23 +13,20 @@ bash scripts/setup-production.sh
 export PGRX_HOME="$SYNTRA_ROOT/.pgrx"
 export PATH="$SYNTRA_ROOT/.tools/bin:$PATH"
 OLD=0.3.0
-CURRENT="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
-if [[ "$CURRENT" != 0.4.0 ]]; then
-    echo "downgrade check failed: only 0.4.0 to 0.3.0 has a downgrade script, workspace is '$CURRENT'" >&2
-    exit 1
-fi
+CURRENT=0.4.0
 WORK="$SYNTRA_ROOT/target/downgrade-check/$(date +%Y%m%d-%H%M%S)-$$"
-mkdir -p "$WORK/base"
+mkdir -p "$WORK/base" "$WORK/current"
 cp -R .tools/postgresql-production/18.6/install "$WORK/pg"
 PG_CONFIG="$WORK/pg/bin/pg_config"
 BIN="$WORK/pg/bin"
 tar xzf "build-support/upgrade-baselines/syntradb-$OLD-src.tgz" -C "$WORK/base"
+tar xzf "build-support/upgrade-baselines/syntradb-$CURRENT-src.tgz" -C "$WORK/current"
 install_from() {
     (cd "$1/crates/syntra-pg" && CARGO_TARGET_DIR="$2" cargo pgrx install --release \
         --cargo=--locked --pg-config "$PG_CONFIG")
 }
 install_old() { install_from "$WORK/base" "$SYNTRA_ROOT/target/upgrade-baseline-$OLD"; }
-install_current() { install_from "$SYNTRA_ROOT" "$SYNTRA_ROOT/target/upgrade-current"; }
+install_current() { install_from "$WORK/current" "$SYNTRA_ROOT/target/upgrade-baseline-$CURRENT"; }
 
 SOCKET="$(mktemp -d /tmp/syntra-downgrade.XXXXXX)"
 "$BIN/initdb" -D "$WORK/data" --username=downgrader --auth=trust --no-locale --encoding=UTF8 >/dev/null
@@ -88,7 +86,7 @@ stop
 
 install_current
 start
-# unslop-ignore NO_SQL_INTERPOLATION -- OLD is a literal and CURRENT is checked to be 0.4.0; ALTER EXTENSION takes no bind parameters.
+# unslop-ignore NO_SQL_INTERPOLATION -- OLD and CURRENT are literals; ALTER EXTENSION takes no bind parameters.
 q downgraded "ALTER EXTENSION syntradb UPDATE TO '$CURRENT'"
 # Small changes on 0.4.0 write partition deltas and version 2 manifests.
 q downgraded "UPDATE feed SET v=-v WHERE id%500=0"
@@ -99,7 +97,7 @@ expect "deltas on $CURRENT" "$(q downgraded "SELECT count(DISTINCT source_relati
 expect "manifests on $CURRENT" "$(q downgraded "SELECT string_agg(octet_length(manifest)::text,',') FROM syntra.capture_checkpoints")" "8272,8272"
 
 # With deltas present the downgrade must refuse and change nothing.
-# unslop-ignore NO_SQL_INTERPOLATION -- OLD is a literal and CURRENT is checked to be 0.4.0; ALTER EXTENSION takes no bind parameters.
+# unslop-ignore NO_SQL_INTERPOLATION -- OLD and CURRENT are literals; ALTER EXTENSION takes no bind parameters.
 if q downgraded "ALTER EXTENSION syntradb UPDATE TO '$OLD'" >/dev/null 2>"$WORK/refused.err"; then
     echo "downgrade check failed: the downgrade ran with partition deltas present" >&2
     exit 1
@@ -108,7 +106,7 @@ grep -q "partition deltas remain" "$WORK/refused.err" || {
     echo "downgrade check failed: the downgrade was refused for another reason: $(head -1 "$WORK/refused.err")" >&2
     exit 1
 }
-# unslop-ignore NO_SQL_INTERPOLATION -- OLD is a literal and CURRENT is checked to be 0.4.0; ALTER EXTENSION takes no bind parameters.
+# unslop-ignore NO_SQL_INTERPOLATION -- OLD and CURRENT are literals; ALTER EXTENSION takes no bind parameters.
 expect "version after refusal" "$(q downgraded "SELECT extversion FROM pg_extension WHERE extname='syntradb'")" "$CURRENT"
 # unslop-ignore NO_SQL_INTERPOLATION -- READ and READ8 are constant queries defined above.
 expect "read after refusal" "$(q downgraded "$READ")" "checkpoint:true"
@@ -120,7 +118,7 @@ expect "folded manifests" "$(q downgraded "SELECT string_agg(octet_length(manife
 # until it is stopped.
 q downgraded "CREATE TABLE prices(id int4 PRIMARY KEY,v numeric(10,2)); INSERT INTO prices VALUES(1,12.30),(2,NULL)"
 q downgraded "SELECT syntra_seed_capture('prices','id','v',16)" >/dev/null
-# unslop-ignore NO_SQL_INTERPOLATION -- OLD is a literal and CURRENT is checked to be 0.4.0; ALTER EXTENSION takes no bind parameters.
+# unslop-ignore NO_SQL_INTERPOLATION -- OLD and CURRENT are literals; ALTER EXTENSION takes no bind parameters.
 if q downgraded "ALTER EXTENSION syntradb UPDATE TO '$OLD'" >/dev/null 2>"$WORK/numeric.err"; then
     echo "downgrade check failed: the downgrade ran with a numeric feed" >&2
     exit 1
@@ -140,7 +138,7 @@ LAG_BEFORE="$(q downgraded "$LAG")"
 
 # A capture writer must not wait for the downgrade: it locks only checkpoint
 # tables. The update stays open two seconds.
-# unslop-ignore NO_SQL_INTERPOLATION -- OLD is a literal and CURRENT is checked to be 0.4.0; ALTER EXTENSION takes no bind parameters.
+# unslop-ignore NO_SQL_INTERPOLATION -- OLD and CURRENT are literals; ALTER EXTENSION takes no bind parameters.
 q downgraded "BEGIN; ALTER EXTENSION syntradb UPDATE TO '$OLD'; SELECT pg_sleep(2); COMMIT;" >/dev/null &
 UPDATER=$!
 sleep 0.5
@@ -152,7 +150,7 @@ if ((WAITED >= 1000)); then
     echo "downgrade check failed: a capture write waited ${WAITED} ms for the downgrade" >&2
     exit 1
 fi
-# unslop-ignore NO_SQL_INTERPOLATION -- OLD is a literal and CURRENT is checked to be 0.4.0; ALTER EXTENSION takes no bind parameters.
+# unslop-ignore NO_SQL_INTERPOLATION -- OLD and CURRENT are literals; ALTER EXTENSION takes no bind parameters.
 expect "version after the downgrade" "$(q downgraded "SELECT extversion FROM pg_extension WHERE extname='syntradb'")" "$OLD"
 stop
 
@@ -193,7 +191,7 @@ stop
 # And up again: 0.4.0 reads the checkpoints 0.3.0 wrote and writes deltas.
 install_current
 start
-# unslop-ignore NO_SQL_INTERPOLATION -- OLD is a literal and CURRENT is checked to be 0.4.0; ALTER EXTENSION takes no bind parameters.
+# unslop-ignore NO_SQL_INTERPOLATION -- OLD and CURRENT are literals; ALTER EXTENSION takes no bind parameters.
 q downgraded "ALTER EXTENSION syntradb UPDATE TO '$CURRENT'"
 q downgraded "UPDATE feed SET v=0 WHERE id=1"
 q downgraded "SELECT applied FROM syntra_apply_prune_capture('feed')" >/dev/null

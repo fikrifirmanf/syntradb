@@ -233,3 +233,28 @@ fn tracking_shard_catalog_is_private() {
         .unwrap();
     Spi::run("SELECT generation FROM syntra.source_generation_shards LIMIT 1").unwrap();
 }
+
+// A captured source's writes leave the counter rows alone; trusted reuse compares
+// the feed position instead. Once capture is retired, writes count again.
+#[pg_test]
+fn captured_writes_skip_the_counter_rows_until_capture_is_retired() {
+    capture_fixture("CREATE TABLE tracked_captured(id int4 PRIMARY KEY, v int4); INSERT INTO tracked_captured VALUES(1,1),(2,2); SELECT syntra_seed_capture('tracked_captured','id','v',64)");
+    let generation = || {
+        Spi::get_one::<i64>(
+            "SELECT generation FROM syntra_source_tracking_status('tracked_captured') LIMIT 1",
+        )
+        .unwrap()
+        .unwrap()
+    };
+    let seeded = generation();
+    Spi::run("UPDATE tracked_captured SET v=v+1; INSERT INTO tracked_captured VALUES(3,3); DELETE FROM tracked_captured WHERE id=2; UPDATE tracked_captured SET id=4 WHERE id=1").unwrap();
+    assert_eq!(generation(), seeded);
+    assert_eq!(
+        Spi::get_one::<i64>("SELECT emitted FROM capture_position WHERE source_relation='tracked_captured'::regclass").unwrap(),
+        Some(6)
+    );
+    Spi::run("SELECT syntra_stop_capture('tracked_captured')").unwrap();
+    let retired = generation();
+    Spi::run("UPDATE tracked_captured SET v=v+1; UPDATE tracked_captured SET v=v+1").unwrap();
+    assert_eq!(generation(), retired + 2);
+}
