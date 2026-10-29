@@ -258,9 +258,11 @@ cycles per second, and the 60-cycle diagnostics slowed only above about 41,000
 with readers running. On 0.4.0 a two-hour soak held the snapshot for an hour:
 writers kept full speed to an age near 89,000, then fell to a fifth of it by
 188,000, and recovered within a minute of release
-([two-hour hold](checkpoint-soak.md#two-hour-hold-int4-2026-10-29)). A snapshot
-left open long enough still stops writers in practice; the largest cost found is
-the statement-tracking counter rows
-([findings](../benchmarks/held-snapshot-writers-2026-10-29.md)). Storage still grows while
+([two-hour hold](checkpoint-soak.md#two-hour-hold-int4-2026-10-29)). 0.5.0 removed the
+statement-tracking counter rows from captured writes, the largest cost found in
+isolation ([findings](../benchmarks/held-snapshot-writers-2026-10-29.md)), but
+the same soak on 0.5.0 still slowed from about the same age
+([0.5.0 run](checkpoint-soak.md#two-hour-hold-on-050-int4-2026-10-29)). A
+snapshot left open long enough still stops writers in practice. Storage still grows while
 a snapshot is held, and these are one laptop's numbers, so keep the policy. Raise the thresholds only after a
 held-snapshot soak passes on the pilot's hardware.

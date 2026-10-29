@@ -234,6 +234,35 @@ The database shrank from 584 MB to 145 MB after release. Each writer backend's
 RSS rose from 30 MB to 151 MB and stayed there; it includes touched shared
 buffers.
 
+### Two-hour hold on 0.5.0, int4, 2026-10-29
+
+The same soak on 0.5.0, where captured statements no longer update a counter
+row, also failed the missed-arrival limit
+(`benchmarks/results/checkpoint-soak-2h-int4-050-2026-10-29.FAILED-missed-arrivals.log`).
+Each writer missed 41,770 of 216,000 offered arrivals (19%), the
+repeatable-read reader 35,126 and the keyed monitor 17,428. No worker failed,
+no invariant failed, and every worker returned to full rate in the first minute
+after release.
+
+| Minute | Horizon age | Writes per writer per minute | Pruner commits | Database |
+|---|---|---|---|---|
+| 15 | 68,130 | 1,637 | 1,433 | — |
+| 21 | 95,713 | 1,460 | 484 | 272 MB |
+| 30 | 124,975 | 798 | 30 | 382 MB |
+| 45 | 157,792 | 722 | 5 | 503 MB |
+| 60 | 179,808 | 510 | 13 | 566 MB |
+| 61 (released) | 1 | 1,627 | — | 365 MB |
+
+Writers slowed from about the same horizon age as on 0.4.0, fell less far by
+minute 60 (510 against 328 writes a minute), and fell faster between minutes
+21 and 30. One run of each does not separate the versions. The pruner fell
+behind before the writers did on both, and at minute 60 the manifest and chunk
+catalogs held 218 MB and 132 MB, against the default 128 MB `shared_buffers`.
+The [held-snapshot control](../benchmarks/held-snapshot-writers-2026-10-29.md#050-captured-writes-skip-the-counter-rows),
+which runs writers and the maintenance worker but no readers, held captured
+writes near 4 ms to an age of 500,000 on 0.5.0. Removing the counter rows
+therefore did not remove the soak slowdown; its remaining cause is not known.
+
 ## Scope
 
 One host, one database, one captured source, and catalogs that fit in memory.

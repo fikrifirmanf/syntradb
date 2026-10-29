@@ -601,4 +601,7 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   a downgrade that kept projections from captured sources. See
   [upgrades](upgrades.md#040-to-050). Rerun on 0.5.0, the held-snapshot control
   kept captured transfers between 2.5 and 4.3 ms to 500,000 dead rows, against
-  2.4 s on 0.4.0. The two-hour soak on 0.5.0 has not finished.
+  2.4 s on 0.4.0. The two-hour soak on 0.5.0 still failed the missed-arrival
+  limit: writers slowed from a horizon age near 96,000 and each missed 19% of
+  offered arrivals, with no invariant failure. See
+  [the soak](checkpoint-soak.md#two-hour-hold-on-050-int4-2026-10-29).

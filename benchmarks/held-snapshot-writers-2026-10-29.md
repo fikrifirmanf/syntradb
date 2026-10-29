@@ -99,3 +99,7 @@ rows per table. The marks, events and checkpoint rows that the hold keeps were
 not isolated and may explain it. This is a 20-minute control at 200 tps, not
 the two-hour soak; the soak must hold writer speed past an age of 89,000 before
 the slowdown counts as fixed.
+It did not: the two-hour soak on 0.5.0 still slowed from about the same age
+([0.5.0 soak](../docs/checkpoint-soak.md#two-hour-hold-on-050-int4-2026-10-29)).
+The control has no readers, so the remaining cost is likely tied to the soak's
+readers, appliers or pruner, which these runs did not isolate.
