@@ -70,3 +70,32 @@ and an upgrade path that keeps reuse correct; the options are in
 [a proposal](../docs/tracking-counter-proposal.md). Until then the snapshot age policy in
 [resource bounds](../docs/resource-bounds.md#snapshot-age-policy) stands: page at
 an age of 10,000, well below where writers slowed.
+
+## 0.5.0: captured writes skip the counter rows
+
+0.5.0 implements option A of the proposal: statements on a captured source no
+longer update a counter row. The same control script, unchanged, ran again on
+0.5.0 on the same laptop
+(`results/hold-control-int4-050-2026-10-29.log`).
+
+| Round | Plain latency | Captured latency | Captured tps | Horizon age |
+|---|---|---|---|---|
+| 1 | 1.9 ms | 23.5 ms | 198 | 12,000 |
+| 2 | 2.0 ms | 2.5 ms | 197 | 25,000 |
+| 10 | 1.9 ms | 2.9 ms | 195 | 127,000 |
+| 20 | 2.0 ms | 3.0 ms | 199 | 253,000 |
+| 30 | 2.0 ms | 3.5 ms | 201 | 378,000 |
+| 40 | 2.0 ms | 4.3 ms | 195 | 503,000 |
+
+No transaction failed on either table, and both ended with matching sums. The
+round 1 figure did not recur and looks like warm-up. Plain latency was lower
+than in the 0.4.0 run (1.9 ms against 3.5 ms), so the laptop was less loaded;
+compare each run's captured column with its own plain column. On 0.4.0 the
+captured side went from 1.3 times plain to 660 times plain by round 40; on
+0.5.0 it went from 1.3 to 2.1 times.
+
+Captured latency still rises slowly, from 2.5 ms to 4.3 ms over 500,000 dead
+rows per table. The marks, events and checkpoint rows that the hold keeps were
+not isolated and may explain it. This is a 20-minute control at 200 tps, not
+the two-hour soak; the soak must hold writer speed past an age of 89,000 before
+the slowdown counts as fixed.
