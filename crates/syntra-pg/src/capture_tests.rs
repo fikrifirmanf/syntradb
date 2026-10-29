@@ -2,6 +2,10 @@ fn capture_fixture(sql: &str) {
     // Serialize private-catalog fixtures against parallel pgrx DDL cleanup.
     Spi::run("LOCK TABLE syntra.capture_checkpoints IN SHARE ROW EXCLUSIVE MODE").unwrap();
     Spi::run("LOCK TABLE syntra.capture_heads IN SHARE ROW EXCLUSIVE MODE").unwrap();
+    // A pg_test never commits, so the deferred capture trigger would never fire.
+    // Firing it per statement checks the same trigger logic; tests of deferral
+    // itself switch back with SET CONSTRAINTS ALL DEFERRED.
+    Spi::run("SET CONSTRAINTS ALL IMMEDIATE").unwrap();
     // Test oracle for the feed position, derived in SQL apart from the engine:
     // the newest mark above the head's folded floor, else the floor.
     Spi::run("CREATE OR REPLACE TEMP VIEW capture_position AS SELECT h.source_relation,h.epoch,h.base_rows,h.pruned,coalesce(m.ordinal,h.emitted) AS emitted,coalesce(m.live_rows,h.live_rows) AS live_rows FROM syntra.capture_heads AS h LEFT JOIN LATERAL (SELECT ordinal,live_rows FROM syntra.capture_marks WHERE epoch=h.epoch AND ordinal>h.emitted ORDER BY ordinal DESC LIMIT 1) AS m ON true").unwrap();
@@ -242,4 +246,49 @@ fn capture_writes_append_marks_and_leave_the_head_row_unversioned() {
             .as_deref(),
         Some("7,7,2,7,2")
     );
+}
+
+#[pg_test]
+fn capture_row_trigger_is_a_deferred_constraint_trigger() {
+    capture_fixture("CREATE TABLE capture_shape(id int4 PRIMARY KEY,v int4); SELECT syntra_seed_capture('capture_shape','id','v',8)");
+    assert_eq!(Spi::get_one::<bool>("SELECT t.tgdeferrable AND t.tginitdeferred AND c.contype='t' AND c.conrelid=t.tgrelid AND c.condeferrable AND c.condeferred FROM pg_trigger AS t JOIN pg_constraint AS c ON c.oid=t.tgconstraint WHERE t.tgrelid='capture_shape'::regclass AND t.tgname='_syntra_capture_row'").unwrap(),Some(true));
+    assert_eq!(Spi::get_one::<bool>("SELECT NOT tgdeferrable AND tgconstraint=0 FROM pg_trigger WHERE tgrelid='capture_shape'::regclass AND tgname='_syntra_capture_no_truncate'").unwrap(),Some(true));
+}
+
+#[pg_test]
+fn deferred_capture_writes_events_in_change_order_only_when_fired() {
+    capture_fixture("CREATE TABLE capture_deferred(id int4 PRIMARY KEY,v int4); INSERT INTO capture_deferred(id,v) VALUES(1,10),(2,20); SELECT syntra_seed_capture('capture_deferred','id','v',16); SET CONSTRAINTS ALL DEFERRED");
+    Spi::run("UPDATE capture_deferred SET v=11 WHERE id=1; UPDATE capture_deferred SET v=12 WHERE id=1; UPDATE capture_deferred SET id=3 WHERE id=2").unwrap();
+    // The trigger is the only code that locks the head row, so no events means
+    // no lock was taken yet.
+    assert_eq!(Spi::get_one::<i64>("SELECT count(*) FROM syntra.capture_events WHERE source_relation='capture_deferred'::regclass").unwrap(),Some(0));
+    // A rolled-back subtransaction's queued firings leave with it.
+    Spi::run("DO $$ BEGIN DELETE FROM capture_deferred WHERE id=1; RAISE EXCEPTION 'discard'; EXCEPTION WHEN raise_exception THEN NULL; END $$").unwrap();
+    Spi::run("SET CONSTRAINTS ALL IMMEDIATE").unwrap();
+    assert_eq!(Spi::get_one::<bool>("SELECT array_agg(key ORDER BY ordinal)=ARRAY[1,1,2,3]::int8[] AND array_agg(before_value ORDER BY ordinal)=ARRAY[10,11,20,NULL]::int8[] AND array_agg(after_value ORDER BY ordinal)=ARRAY[11,12,NULL,20]::int8[] AND bool_and(origin_xid=pg_current_xact_id()) FROM syntra.capture_events WHERE source_relation='capture_deferred'::regclass").unwrap(),Some(true));
+    assert_eq!(Spi::get_one::<bool>("SELECT emitted=4 AND live_rows=2 FROM capture_position WHERE source_relation='capture_deferred'::regclass").unwrap(),Some(true));
+}
+
+#[pg_test(
+    error = "capture log is full or registration changed; apply and prune or reseed before writing"
+)]
+fn deferred_capture_refuses_a_full_log_when_it_fires() {
+    capture_fixture("CREATE TABLE capture_deferred_full(id int4 PRIMARY KEY,v int4); INSERT INTO capture_deferred_full(id,v) VALUES(1,10); SELECT syntra_seed_capture('capture_deferred_full','id','v',2); SET CONSTRAINTS ALL DEFERRED");
+    Spi::run("UPDATE capture_deferred_full SET v=v+1; UPDATE capture_deferred_full SET v=v+1; UPDATE capture_deferred_full SET v=v+1").unwrap();
+    Spi::run("SET CONSTRAINTS ALL IMMEDIATE").unwrap();
+}
+
+#[pg_test]
+fn capture_keeps_an_immediate_row_trigger_from_before_the_upgrade() {
+    // 0.5.0 installed this trigger; it fires per statement even when deferral is asked for.
+    capture_fixture("CREATE TABLE capture_immediate(id int4 PRIMARY KEY,v int4); CREATE TRIGGER _syntra_capture_row AFTER INSERT OR UPDATE OR DELETE ON capture_immediate FOR EACH ROW EXECUTE FUNCTION public.syntra_capture_row(); ALTER TABLE capture_immediate ENABLE ALWAYS TRIGGER _syntra_capture_row; SELECT syntra_seed_capture('capture_immediate','id','v',8); SET CONSTRAINTS ALL DEFERRED");
+    assert_eq!(Spi::get_one::<bool>("SELECT h.row_trigger=t.oid AND NOT t.tgdeferrable FROM syntra.capture_heads AS h JOIN pg_trigger AS t ON t.tgrelid=h.source_relation AND t.tgname='_syntra_capture_row' WHERE h.source_relation='capture_immediate'::regclass").unwrap(),Some(true));
+    Spi::run("INSERT INTO capture_immediate(id,v) VALUES(1,5)").unwrap();
+    assert_eq!(Spi::get_one::<bool>("SELECT count(*)=1 AND bool_and(after_value=5) FROM syntra.capture_events WHERE source_relation='capture_immediate'::regclass").unwrap(),Some(true));
+}
+
+#[pg_test(error = "existing capture trigger is incompatible; repair it before seeding")]
+fn capture_refuses_a_deferrable_row_trigger_that_starts_immediate() {
+    capture_fixture("CREATE TABLE capture_half_deferred(id int4 PRIMARY KEY,v int4); CREATE CONSTRAINT TRIGGER _syntra_capture_row AFTER INSERT OR UPDATE OR DELETE ON capture_half_deferred DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION public.syntra_capture_row(); ALTER TABLE capture_half_deferred ENABLE ALWAYS TRIGGER _syntra_capture_row");
+    Spi::run("SELECT syntra_seed_capture('capture_half_deferred','id','v',8)").unwrap();
 }

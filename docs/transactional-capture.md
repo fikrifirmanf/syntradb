@@ -61,7 +61,16 @@ Events and cursor reservations use the source transaction. Abort and savepoint
 rollback remove them with the source changes. A row lock on the feed head orders
 writers per source and keeps committed event prefixes contiguous. It can serialize
 writes and cause ordinary transaction deadlocks or serialization errors. Retry the
-whole transaction when PostgreSQL requires it. This initial path makes no
+whole transaction when PostgreSQL requires it.
+
+From 0.6.0 the row trigger is a constraint trigger, `DEFERRABLE INITIALLY
+DEFERRED`. It fires for each changed row when the transaction commits, so the
+head lock is held only from commit-time capture to commit, not from the first
+captured statement on. Capture errors, a full log among them, are raised at
+`COMMIT` and roll back the whole transaction; a savepoint around one statement
+does not catch them. A transaction's own uncommitted changes are not in the
+feed. `SET CONSTRAINTS ALL IMMEDIATE`, or naming `_syntra_capture_row`, fires
+the trigger per statement again. This initial path makes no
 write-scaling claim. Capture remains off by default.
 
 Writers lock the head row but do not update it. Each row callback appends one

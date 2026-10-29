@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Upgrade a database while captured writers are running. Writers start right after
 # the new library is installed. From 0.1.0 or 0.2.0 they fail closed until ALTER
-# EXTENSION UPDATE commits, then succeed; from 0.3.0 every write must succeed,
-# since 0.4.0 changes only checkpoint storage, while a loop applies and prunes as the maintenance worker would. Every write a writer sees succeed adds
+# EXTENSION UPDATE commits, then succeed; from 0.3.0, 0.4.0 or 0.5.0 every write
+# must succeed: the new library captures with the old schema's row trigger, and
+# the update only makes writers wait while it replaces that trigger. Meanwhile a
+# loop applies and prunes as the maintenance worker would. Every write a writer sees succeed adds
 # one to the feed's sum, so the heap sum must equal the starting sum plus that
 # count: no committed write may be lost, and none may commit twice. After the
 # update the checkpoint read must match the heap, and the feed must drain.
@@ -14,7 +16,7 @@ cd "$SYNTRA_ROOT"
 FROM="${1:-0.2.0}"
 SECONDS_RUN="${2:-30}"
 TPS="${3:-100}"
-[[ "$FROM" =~ ^0\.[123]\.0$ ]] || { echo "upgrade load check: from-version must be 0.1.0, 0.2.0 or 0.3.0" >&2; exit 2; }
+[[ "$FROM" =~ ^0\.[1-5]\.0$ ]] || { echo "upgrade load check: from-version must be 0.1.0 through 0.5.0" >&2; exit 2; }
 for value in "$SECONDS_RUN" "$TPS"; do
     [[ "$value" =~ ^[1-9][0-9]{0,3}$ ]] || { echo "upgrade load check: '$value' is not a positive integer" >&2; exit 2; }
 done
@@ -61,7 +63,7 @@ READ="SELECT s.route||':'||(ROW(s.rows,s.non_nulls,s.sum,s.min,s.max) IS NOT DIS
 
 start
 "$BIN/psql" -h "$SOCKET" -p "$PORT" -U upgrader -d postgres -v ON_ERROR_STOP=1 -AtqX -c "CREATE DATABASE upgraded" >/dev/null
-# unslop-ignore NO_SQL_INTERPOLATION -- FROM is one of three literal versions, checked above.
+# unslop-ignore NO_SQL_INTERPOLATION -- FROM is a literal x.y.0 version, checked above.
 q "CREATE EXTENSION syntradb VERSION '$FROM'"
 q "CREATE TABLE feed(id int4 PRIMARY KEY,v int4); INSERT INTO feed SELECT g,g FROM generate_series(1,5000) AS g"
 q "SELECT syntra_seed_capture('feed','id','v',4096)" >/dev/null
@@ -128,8 +130,8 @@ for w in 1 2 3 4; do
     PROCESSED=$((PROCESSED + ok))
     FAILED=$((FAILED + bad))
 done
-if [[ "$FROM" == 0.3.0 ]]; then
-    ((FAILED == 0)) || fail "$FAILED writes failed during the 0.3.0 update; see $WORK/writer-*.err"
+if [[ "$FROM" != 0.1.0 && "$FROM" != 0.2.0 ]]; then
+    ((FAILED == 0)) || fail "$FAILED writes failed during the $FROM update; see $WORK/writer-*.err"
 else
     grep -q "capture configuration is missing or changed" "$WORK"/writer-*.err || fail "no writer failed closed before the update"
     if grep -hv "capture configuration is missing or changed\|^$\|^psql: error\|^CONTEXT:\|^PL/\|^LINE\|^ *\^" "$WORK"/writer-*.err | grep -q .; then

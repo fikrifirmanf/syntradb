@@ -77,11 +77,27 @@ LIVE="SELECT s.route||':'||s.reason||':'||(s.sum IS NOT DISTINCT FROM n.sum)
     FROM syntra_live_int4_summary('feed','v') AS s,(SELECT sum(v) FROM feed) AS n"
 q upgraded "SELECT syntra_publish_trusted_int4('feed','v')" >/dev/null
 expect "$FROM trusted read" "$(q upgraded "$LIVE")" "projection:eligible:true"
+if [[ "$FROM" == 0.5.0 ]]; then
+    # A feed whose row trigger was disabled may have missed writes. The 0.6.0
+    # update must leave it invalid, not install a working trigger over the gap.
+    q upgraded "CREATE TABLE gap(id int4 PRIMARY KEY,v int4); INSERT INTO gap VALUES(1,1)"
+    q upgraded "SELECT syntra_seed_capture('gap','id','v',8)" >/dev/null
+    q upgraded "ALTER TABLE gap DISABLE TRIGGER _syntra_capture_row; UPDATE gap SET v=2 WHERE id=1"
+fi
 stop
 
 install_from "$SYNTRA_ROOT" "$SYNTRA_ROOT/target/upgrade-current"
 start
-if [[ "$FROM" == 0.4.0 ]]; then
+if [[ "$FROM" == 0.5.0 ]]; then
+    # The 0.6.0 library accepts the immediate row trigger 0.5.0 installed, so
+    # writes are captured and reads replay before the update.
+    q upgraded "UPDATE feed SET v=0 WHERE id=1"
+    BEFORE_EVENTS=1
+    # unslop-ignore NO_SQL_INTERPOLATION -- READ is the constant query defined above.
+    expect "read before the update" "$(q upgraded "$READ")" "replay:true"
+    # unslop-ignore NO_SQL_INTERPOLATION -- LIVE is the constant query defined above.
+    expect "trusted read before the update" "$(q upgraded "$LIVE")" "heap:version_changed:true"
+elif [[ "$FROM" == 0.4.0 ]]; then
     # 0.5.0 keeps the 0.4.0 capture and checkpoint formats: writes are captured
     # and reads replay before the update. Only trusted reuse needs the new column.
     q upgraded "UPDATE feed SET v=0 WHERE id=1"
@@ -114,12 +130,11 @@ else
     BEFORE_EVENTS=0
 fi
 # A writer that arrives while the update is still open must never be captured
-# against a half-updated catalog. From 0.1.0 it fails closed: the 0.2.0 step
-# changes the bindings before the writer reads them. From 0.2.0 it waits: the
-# 0.3.0 step holds ACCESS EXCLUSIVE on capture_bindings, and after commit the
-# writer reads the new bindings and is captured. From 0.3.0 and 0.4.0 it is
-# captured at once: the 0.4.0 step locks only checkpoint tables and the 0.5.0
-# step only the trusted catalog, which writers never touch.
+# against a half-updated catalog. The last step, 0.5.0 to 0.6.0, replaces the
+# source's row trigger under a table lock that it holds to commit, so from every
+# release the writer waits and, after commit, reads the new bindings and is
+# captured. From 0.1.0 it may instead fail closed, if it reads the bindings
+# after the 0.2.0 step changes them and before that lock is taken.
 # The update stays open two seconds, so a writer that returns in under a second
 # did not wait.
 # unslop-ignore NO_SQL_INTERPOLATION -- CURRENT is checked as x.y.z above; ALTER EXTENSION takes no bind parameters.
@@ -142,17 +157,9 @@ case "$FROM:$DURING" in
     expect "write during the update rolled back" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "60"
     DURING_EVENTS=0
     ;;
-0.2.0:captured)
+*:captured)
     if [ "$WAITED" -lt 1000 ]; then
         echo "upgrade check failed: a capture write finished while the update was open" >&2
-        exit 1
-    fi
-    expect "write during the update" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "160"
-    DURING_EVENTS=1
-    ;;
-0.3.0:captured | 0.4.0:captured)
-    if [ "$WAITED" -ge 1000 ]; then
-        echo "upgrade check failed: a capture write waited ${WAITED} ms for the update" >&2
         exit 1
     fi
     expect "write during the update" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "160"
@@ -166,6 +173,18 @@ case "$FROM:$DURING" in
 esac
 # unslop-ignore NO_SQL_INTERPOLATION -- constant SQL; CURRENT is only the expected value.
 expect "version" "$(q upgraded "SELECT extversion FROM pg_extension WHERE extname='syntradb'")" "$CURRENT"
+if [[ "$FROM" == 0.5.0 ]]; then
+    expect "gap feed trigger" "$(q upgraded "SELECT tgenabled::text||':'||tgdeferrable::text FROM pg_trigger WHERE tgrelid='gap'::regclass AND tgname='_syntra_capture_row'")" "D:false"
+    # unslop-ignore NO_SQL_INTERPOLATION -- constant SQL; only the stderr path is a variable.
+    if q upgraded "SELECT applied FROM syntra_apply_prune_capture('gap')" >/dev/null 2>"$WORK/gap.err"; then
+        echo "upgrade check failed: maintenance accepted a feed whose trigger was disabled" >&2
+        exit 1
+    fi
+    q upgraded "SELECT syntra_stop_capture('gap')" >/dev/null
+    q upgraded "DROP TABLE gap"
+fi
+# Every feed's row trigger is the deferred one 0.6.0 installs.
+expect "row trigger" "$(q upgraded "SELECT string_agg(t.tgdeferrable::text||t.tginitdeferred::text||t.tgenabled::text,',') FROM syntra.capture_heads AS h JOIN pg_trigger AS t ON t.oid=h.row_trigger")" "truetrueA"
 expect "bindings" "$(q upgraded "SELECT count(*) FROM syntra.capture_heads AS h JOIN syntra.capture_bindings AS b USING(source_relation,epoch,tracking_epoch,key_attribute,value_attribute,row_trigger,truncate_trigger,source_identity)")" "1"
 expect "replayed $FROM history" "$(q upgraded "$READ")" "replay:true"
 q upgraded "UPDATE feed SET v=v+5 WHERE id<=20"

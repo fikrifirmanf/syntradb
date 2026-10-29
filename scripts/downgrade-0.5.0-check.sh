@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Downgrade a live database from the workspace release (0.5.0) to 0.4.0 and back.
+# Downgrade a live database from 0.5.0 to 0.4.0 and back, both built from baselines.
 # 0.5.0 writers to a captured source leave its counter rows unchanged, and 0.4.0
 # reuses a projection whose counters match, so the downgrade must remove every
 # projection of a captured source. Three sources:
@@ -19,23 +19,20 @@ bash scripts/setup-production.sh
 export PGRX_HOME="$SYNTRA_ROOT/.pgrx"
 export PATH="$SYNTRA_ROOT/.tools/bin:$PATH"
 OLD=0.4.0
-CURRENT="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
-if [[ "$CURRENT" != 0.5.0 ]]; then
-    echo "downgrade check failed: this check covers 0.5.0 to 0.4.0, workspace is '$CURRENT'" >&2
-    exit 1
-fi
+CURRENT=0.5.0
 WORK="$SYNTRA_ROOT/target/downgrade-0.5.0-check/$(date +%Y%m%d-%H%M%S)-$$"
-mkdir -p "$WORK/base"
+mkdir -p "$WORK/base" "$WORK/current"
 cp -R .tools/postgresql-production/18.6/install "$WORK/pg"
 PG_CONFIG="$WORK/pg/bin/pg_config"
 BIN="$WORK/pg/bin"
 tar xzf "build-support/upgrade-baselines/syntradb-$OLD-src.tgz" -C "$WORK/base"
+tar xzf "build-support/upgrade-baselines/syntradb-$CURRENT-src.tgz" -C "$WORK/current"
 install_from() {
     (cd "$1/crates/syntra-pg" && CARGO_TARGET_DIR="$2" cargo pgrx install --release \
         --cargo=--locked --pg-config "$PG_CONFIG")
 }
 install_old() { install_from "$WORK/base" "$SYNTRA_ROOT/target/upgrade-baseline-$OLD"; }
-install_current() { install_from "$SYNTRA_ROOT" "$SYNTRA_ROOT/target/upgrade-current"; }
+install_current() { install_from "$WORK/current" "$SYNTRA_ROOT/target/upgrade-baseline-$CURRENT"; }
 
 SOCKET="$(mktemp -d /tmp/syntra-downgrade5.XXXXXX)"
 "$BIN/initdb" -D "$WORK/data" --username=downgrader --auth=trust --no-locale --encoding=UTF8 >/dev/null

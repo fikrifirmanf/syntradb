@@ -261,6 +261,72 @@ one published on 0.4.0, and the check failed.
 `scripts/downgrade-check.sh` still checks 0.4.0 to 0.3.0, now building 0.4.0
 from its archived source; it passed again.
 
+## 0.5.0 to 0.6.0
+
+0.6.0 fires the capture row trigger at commit. The trigger locks the feed head
+row and keeps the lock to commit, so that ordinals stay gap-free and follow
+commit order. Fired per statement, it took the lock at a transaction's first
+captured change, and every later statement of that transaction ran while other
+captured writers and pruning waited. Under a held snapshot those statements
+slowed, and the queue on the lock grew until writers missed their arrivals
+([findings](../benchmarks/held-snapshot-writers-2026-10-29.md#050-what-still-slows-the-soak)).
+A deferred trigger takes the lock only when the transaction commits.
+
+The row trigger is now a constraint trigger, `DEFERRABLE INITIALLY DEFERRED`.
+The event, mark and checkpoint formats are unchanged. What a writer sees changes:
+
+- a full capture log, a changed registration and the other capture errors are
+  raised at `COMMIT`, not by the statement, and roll back the whole
+  transaction; a savepoint around the statement no longer catches them;
+- events for a transaction's changes are written at commit, so its own
+  uncommitted changes are never in the feed (readers inside a writing
+  transaction already fall back to the heap);
+- `SET CONSTRAINTS ALL IMMEDIATE`, or naming `_syntra_capture_row`, fires the
+  trigger per statement again, with the 0.5.0 lock behavior;
+- the recorded `command_id` is the command that fired the trigger at commit.
+
+The script replaces each feed's row trigger and records the new OID in
+`syntra.capture_heads` and `syntra.capture_bindings`. It replaces only a trigger
+that is still the feed's valid one; a disabled or missing trigger may already
+have missed writes, so it stays invalid and capture keeps failing closed until
+the feed is reseeded. The DDL guards would treat the replacement as a source
+change and retire the feed, so the script turns `event_triggers` off for its
+own duration only.
+
+Install the library, restart or end every session that loaded 0.5.0, then run
+`ALTER EXTENSION syntradb UPDATE`. Between the restart and the update, the 0.6.0
+library accepts the immediate trigger 0.5.0 installed, so capture,
+maintenance, checkpoint and trusted reads work as on 0.5.0. The update holds a
+table lock on each captured source to commit: a write sent while it is open
+waits, then reads the new bindings and is captured.
+
+Each of these planted bugs made a check fail: replacing a disabled trigger
+(the gap feed kept a working trigger), leaving the bindings on the old OID and
+running with the DDL guards active (a write during the update failed closed),
+skipping the swap in the downgrade (it no longer waited for the writer), and a
+seed that installed an immediate trigger (two PostgreSQL tests).
+
+## 0.6.0 to 0.5.0 (downgrade)
+
+With the 0.6.0 library still installed, run `ALTER EXTENSION syntradb UPDATE TO
+'0.5.0'`, then install the 0.5.0 library and restart. The script replaces each
+deferred row trigger with the immediate one 0.5.0 installs. A writer holds its
+source's lock until commit, and its queued changes fire before it releases the
+lock, so the downgrade waits for it and loses none.
+
+`scripts/downgrade-0.6.0-check.sh` seeds a feed on 0.6.0, leaves history pending,
+and starts a writer that holds an update and an insert uncommitted for three
+seconds. It runs the downgrade while that writer is open, then checks that:
+
+- the downgrade waited for the writer, and the writer's two changes are in the
+  feed;
+- the row trigger is immediate after the downgrade, and the 0.6.0 library still
+  reads the pending history exactly;
+- on the 0.5.0 library new writes are captured, and the history from both
+  releases replays and checkpoints to match the heap;
+- the catalog matches a fresh 0.5.0 install, and after a second update the
+  trigger is deferred again and the catalog matches a fresh 0.6.0 install.
+
 ## Upgrade check
 
 ```sh
@@ -268,6 +334,7 @@ bash scripts/upgrade-check.sh          # from 0.1.0
 bash scripts/upgrade-check.sh 0.2.0    # from 0.2.0
 bash scripts/upgrade-check.sh 0.3.0    # from 0.3.0
 bash scripts/upgrade-check.sh 0.4.0    # from 0.4.0
+bash scripts/upgrade-check.sh 0.5.0    # from 0.5.0
 ```
 
 The check builds the archived source
@@ -277,11 +344,16 @@ feed, applies and prunes some history, and leaves five events unapplied. It then
 swaps in the new library and checks that:
 
 - from 0.1.0 and 0.2.0, a capture write is rejected before the update, with its
-  source change rolled back; from 0.3.0 it is captured, maintenance fails, and a
-  read falls back to the heap and matches it;
-- a write sent while the update transaction is open fails closed from 0.1.0, from
-  0.2.0 waits at least a second for the update and is then captured, and from
-  0.3.0 is captured in under a second;
+  source change rolled back; from 0.3.0 and 0.4.0 it is captured, maintenance
+  fails, and a read falls back to the heap and matches it; from 0.5.0 it is
+  captured and reads replay;
+- a write sent while the update transaction is open waits at least a second for
+  the update, which holds each captured source's lock to commit while it
+  replaces the row trigger, and is then captured; from 0.1.0 it may instead fail
+  closed;
+- from 0.5.0, a feed whose row trigger was disabled keeps the disabled trigger
+  and maintenance on it fails, and every other feed's row trigger is the
+  deferred one;
 - after the update, `extversion` is current and the bindings match the heads;
 - the checkpoint read replays the old history and matches the heap exactly;
 - new writes, apply and prune, lag and status counts, headroom, stop and reseed
@@ -306,13 +378,21 @@ passed from 0.1.0, 0.2.0, 0.3.0 and 0.4.0 to 0.5.0, with 506 entries
 a projection with no stored position as matching served the stale 0.4.0
 projection after captured writes, and the check failed.
 
+Later on 2026-10-29 it passed from 0.1.0 through 0.5.0 to 0.6.0, with 506
+entries, and the three downgrade checks passed on the same tree
+(`benchmarks/results/upgrade-0.5.0-to-060-check-2026-10-29.log` and the files
+beside it named `*-to-060-check-2026-10-29.log`; the downgrade-0.5.0 and
+downgrade-0.4.0 logs are those older checks rerun on the 0.6.0 tree). The
+0.6.0 downgrade waited 2,418 ms for a writer holding queued changes and
+captured both of them.
+
 ## Upgrade under load
 
 ```sh
 bash scripts/upgrade-load-check.sh [from-version] [seconds] [tps]
 ```
 
-The check installs the new library over a running 0.1.0, 0.2.0 or 0.3.0 database and
+The check installs the new library over a running 0.1.0 to 0.5.0 database and
 starts four writers on a captured 5,000-row feed at once, with a loop that applies
 and prunes twice a second in place of the maintenance worker. Four seconds later it
 runs `ALTER EXTENSION UPDATE`. Every write is counted as it succeeds or fails. The
@@ -342,6 +422,12 @@ equivalent running.
 To 0.4.0 (`benchmarks/results/upgrade-load-0.4.0-2026-10-28.log`), 60 s at
 100 tps: from 0.3.0, 3,956 writes committed and none failed, with the update
 taking 13 ms; from 0.2.0, 3,776 committed and 252 failed closed, 15 ms.
+
+To 0.6.0 (`benchmarks/results/upgrade-load-0.6.0-2026-10-29.log`), 60 s at
+100 tps: from 0.5.0, 0.4.0 and 0.3.0, 3,965 to 4,012 writes committed and none
+failed, with the update taking 30, 5 and 9 ms. The update locks the one source
+to commit while it replaces the row trigger, and no deadlock with the writers or
+the apply loop showed up in these runs.
 
 This is four writers on one small feed with one psql per write. It does not
 cover many writers, large feeds under load, or the maintenance worker

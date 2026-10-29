@@ -605,3 +605,14 @@ A change that truncated values to 32 bits failed three of the `int8` tests.
   limit: writers slowed from a horizon age near 96,000 and each missed 19% of
   offered arrivals, with no invariant failure. See
   [the soak](checkpoint-soak.md#two-hour-hold-on-050-int4-2026-10-29).
+- **0.6.0 commit-time capture.** The capture row trigger is a constraint trigger,
+  `DEFERRABLE INITIALLY DEFERRED`, so a writer locks the feed head only from
+  commit-time capture to commit. The full check passed with 190 PostgreSQL
+  tests (`benchmarks/results/check-0.6.0-2026-10-29.log`). Upgrades from 0.1.0
+  through 0.5.0 to 0.6.0 passed with 506 catalog entries identical to a fresh
+  install, and the 0.6.0, 0.5.0 and 0.4.0 downgrade checks passed. Upgrades
+  under four writers from 0.3.0, 0.4.0 and 0.5.0 lost and failed no write. Five
+  planted bugs failed a check: a seed that installed an immediate trigger, an
+  update that replaced a disabled trigger, one that left the bindings stale,
+  one run with the DDL guards active, and a downgrade that skipped the swap. See
+  [upgrades](upgrades.md#050-to-060).

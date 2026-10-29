@@ -23,7 +23,15 @@ fn full() -> ! {
     );
 }
 
-fn trigger_valid(source: &PgRelation, oid: pg_sys::Oid, procedure: pg_sys::Oid, kind: i16) -> bool {
+/// A deferred trigger is a constraint trigger that is deferrable and initially
+/// deferred; any other trigger must be a plain, immediate one.
+fn trigger_valid(
+    source: &PgRelation,
+    oid: pg_sys::Oid,
+    procedure: pg_sys::Oid,
+    kind: i16,
+    deferred: bool,
+) -> bool {
     // SAFETY: source is locked for the statement; all descriptor fields are
     // inspected synchronously and no catalog pointer escapes.
     unsafe {
@@ -42,13 +50,21 @@ fn trigger_valid(source: &PgRelation, oid: pg_sys::Oid, procedure: pg_sys::Oid, 
                 && t.tgnargs == 0
                 && t.tgnattr == 0
                 && t.tgqual.is_null()
-                && t.tgconstraint == pg_sys::InvalidOid
-                && !t.tgdeferrable
-                && !t.tginitdeferred
+                && (t.tgconstraint != pg_sys::InvalidOid) == deferred
+                && t.tgdeferrable == deferred
+                && t.tginitdeferred == deferred
                 && t.tgoldtable.is_null()
                 && t.tgnewtable.is_null()
         })
     }
+}
+
+/// The row trigger is deferred from 0.6.0. The immediate trigger of 0.5.0 also
+/// captures every change, firing per statement and holding the head lock longer,
+/// and stays valid until ALTER EXTENSION UPDATE replaces it.
+fn row_trigger_valid(source: &PgRelation, oid: pg_sys::Oid, procedure: pg_sys::Oid) -> bool {
+    trigger_valid(source, oid, procedure, 29, true)
+        || trigger_valid(source, oid, procedure, 29, false)
 }
 
 fn install(
@@ -58,6 +74,7 @@ fn install(
     events: i16,
     row: bool,
     before: bool,
+    deferred: bool,
 ) -> pg_sys::Oid {
     let procedure =
         function_oid(function).unwrap_or_else(|| pgrx::error!("capture function is missing"));
@@ -73,7 +90,11 @@ fn install(
     unsafe {
         let existing = pg_sys::get_trigger_oid(source.oid(), name.as_ptr(), true);
         if existing != pg_sys::InvalidOid {
-            if !trigger_valid(source, existing, procedure, kind) {
+            // A deferred trigger may also be the immediate one 0.5.0 installed,
+            // until ALTER EXTENSION UPDATE replaces it; it captures the same rows.
+            if !trigger_valid(source, existing, procedure, kind, deferred)
+                && !(deferred && trigger_valid(source, existing, procedure, kind, false))
+            {
                 pgrx::error!("existing capture trigger is incompatible; repair it before seeding");
             }
             return existing;
@@ -88,6 +109,9 @@ fn install(
         } else {
             0
         };
+        statement.isconstraint = deferred;
+        statement.deferrable = deferred;
+        statement.initdeferred = deferred;
         pg_sys::CreateTriggerFiringOn(
             statement.as_ptr(),
             c"SyntraDB bounded capture".as_ptr(),
@@ -266,6 +290,8 @@ fn syntra_seed_capture(
     // Refresh this backend's relcache after native trigger installation.
     // SAFETY: this backend already holds the source exclusive lock.
     let fresh = unsafe { PgRelation::with_lock(source.oid(), pg_sys::AccessShareLock as i32) };
+    // The row trigger fires at commit, so the head-row lock it takes is held only
+    // through commit instead of from the first captured change.
     let row_trigger = install(
         &fresh,
         c"_syntra_capture_row",
@@ -273,6 +299,7 @@ fn syntra_seed_capture(
         28,
         true,
         false,
+        true,
     );
     // SAFETY: source exclusive lock is still held; reopen reloads trigger metadata.
     let fresh = unsafe { PgRelation::with_lock(source.oid(), pg_sys::AccessShareLock as i32) };
@@ -283,6 +310,7 @@ fn syntra_seed_capture(
         32,
         false,
         true,
+        false,
     );
     let snapshot = Snapshot::latest();
     let snapshot_text = snapshot.text();
@@ -576,17 +604,17 @@ pub(super) fn current_configuration(
         || !guards_current(source, statement_guard)
         || unsafe { source.trigdesc.is_null() || (*source.trigdesc).numtriggers != 3 }
         || config.identity != crate::live::identity(source, config.value)
-        || !trigger_valid(
+        || !row_trigger_valid(
             source,
             config.row,
             function_oid(c"public.syntra_capture_row()").ok_or("capture_unavailable")?,
-            29,
         )
         || !trigger_valid(
             source,
             config.truncate,
             function_oid(c"public.syntra_capture_no_truncate()").ok_or("capture_unavailable")?,
             34,
+            false,
         )
     {
         return Err("capture_unavailable");
@@ -808,6 +836,9 @@ fn syntra_capture_row<'a>(
     // Lock, do not update, the head row. The lock is held to commit, so ordinals
     // stay gap-free and follow commit order as they did with the counter update,
     // but the row gains no version per write. Only pruning still updates it.
+    // This trigger is deferred, so the first firing takes the lock at commit and
+    // the transaction's earlier statements run without it. SET CONSTRAINTS
+    // IMMEDIATE fires it per statement instead, holding the lock from there.
     let (floor, limit, floor_rows) = Spi::get_three_with_args::<i64, i64, i64>(
         r#"SELECT h.emitted,h.pruned+h.max_events,h.live_rows FROM syntra.capture_heads AS h
         JOIN syntra.tracked_sources AS s ON s.source_relation=h.source_relation AND s.epoch=h.tracking_epoch

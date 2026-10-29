@@ -50,12 +50,17 @@ free events. The horizon thresholds come from
 
 ## Errors and what to do
 
+From 0.6.0 the capture errors below are raised when the transaction commits,
+not by the statement that changed the row. `COMMIT` fails and the whole
+transaction rolls back, so retry the whole transaction. A savepoint around the
+statement does not catch them.
+
 | Error | Meaning | Action |
 |---|---|---|
 | `capture log is full or registration changed; apply and prune or reseed before writing` (54000) | The feed holds 4,096 events, or capture changed under the writer | Run `syntra_apply_prune_capture`, then retry the write. If the feed does not drain, find out why before reseeding |
 | `checkpoint maintenance is busy; retry after its transaction ends` (55P03) | Another apply or prune holds the maintenance lock, or a vacuum held it for over a second | Retry. The worker skips the source until its next pass |
 | `capture configuration is missing or changed; reseed before writing` | A captured column changed, for example its `numeric` precision | Reseed with `syntra_seed_capture` |
-| `capture cannot store NaN in a numeric column` | A write tried to store `NaN` in a captured `numeric` column | Fix the writer. The statement rolled back |
+| `capture cannot store NaN in a numeric column` | A write tried to store `NaN` in a captured `numeric` column | Fix the writer. The transaction rolled back |
 | Deadlock (40P01) or serialization failure (40001) | Captured writers to one source take the feed head lock in turn | Retry the whole transaction |
 | `WARNING: syntradb maintenance skipped relation <oid>: <reason>` | Apply failed on that source; the worker moved on | Read the reason. A tampered or broken feed needs a reseed |
 
