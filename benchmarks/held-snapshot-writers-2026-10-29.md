@@ -269,3 +269,31 @@ layout that appends chunk deltas instead of updating one row per partition,
 as `capture_marks` did for the head row, would remove the apply growth; how
 much of the writer slowdown it would recover is not measured, and the bench
 has no capture-off soak to separate PostgreSQL's share.
+
+### Readers
+
+A second one-hour soak sampled the readers, the keyed monitor and an applier
+at minutes 8 and 28 (`soak-sample.sh` now takes the actor names as a fourth
+argument; samples in `benchmarks/results/soak-samples-060-readers-2026-10-29/`,
+log `benchmarks/results/checkpoint-soak-1h-int4-060-readers-sampled-2026-10-29.FAILED-missed-arrivals.log`).
+It failed the missed-arrival limit on the repeatable-read reader, which missed
+8,793 of 108,000 offered arrivals; each writer missed about 1,730 (1.6%) and no
+invariant failed.
+
+Each soak read runs the SyntraDB summary beside a native
+`count(*)`, `count(v)`, `sum`, `min`, `max` over `checkpoint_stress_source`,
+which the bench uses as ground truth. In the repeatable-read reader:
+
+| Minute | Native scan samples | SyntraDB read samples |
+|---|---|---|
+| 8 | 1,902 | 776 |
+| 28 | 8,727 | 1,070 |
+
+The native scan grew 4.6 times as the held snapshot kept dead source rows; the
+SyntraDB read grew 1.4 times. The keyed monitor's busy time was likewise
+mostly native heap and index lookups. The reader misses in the soak therefore
+measure mostly the bench's own verification paying PostgreSQL's dead-version
+cost. The soak's missed-arrival limit mixes three costs: that verification,
+PostgreSQL's cost on the source for the writers, and SyntraDB's apply time,
+which grows with chunk versions and blocks pruning. Only the last is
+SyntraDB's to remove.

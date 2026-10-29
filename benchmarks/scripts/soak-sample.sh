@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # Takes macOS `sample` stack profiles of named checkpoint soak backends while a
-# soak runs. Usage: soak-sample.sh OUT_DIR "MINUTE ..." [SECONDS]
+# soak runs. Usage: soak-sample.sh OUT_DIR "MINUTE ..." [SECONDS] [NAMES]
 # Each listed minute after the soak's workers start, every backend whose
-# application_name is pruner, writer_0 or applier_0 is sampled for SECONDS.
+# application_name is in NAMES (default "pruner writer_0 applier_0") is
+# sampled for SECONDS.
 set -euo pipefail
 out=$1
 minutes=$2
 seconds=${3:-10}
+names=${4:-pruner writer_0 applier_0}
+for name in $names; do
+    [[ "$name" =~ ^[a-z_0-9]+$ ]] || { echo "soak-sample: invalid name $name" >&2; exit 2; }
+done
+in_list="'${names// /','}'"
 psql="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.tools/postgresql-production/18.6/install/bin/psql"
 test ! -e "$out"
 mkdir -p "$out"
@@ -27,7 +33,8 @@ start=$(date +%s)
 echo "workers seen at $(date '+%H:%M:%S'), socket $socket" > "$out/index.txt"
 for minute in $minutes; do
     while [ $(( $(date +%s) - start )) -lt $(( minute * 60 )) ]; do sleep 5; done
-    query "SELECT application_name, pid FROM pg_stat_activity WHERE application_name IN ('pruner','writer_0','applier_0') ORDER BY 1" |
+    # unslop-ignore NO_SQL_INTERPOLATION -- each name is checked against ^[a-z_0-9]+$ above; psql -c takes no bind parameters.
+    query "SELECT application_name, pid FROM pg_stat_activity WHERE application_name IN ($in_list) ORDER BY 1" |
         while IFS='|' read -r name pid; do
             sample "$pid" "$seconds" -file "$out/m${minute}-${name}.txt" > /dev/null 2>&1 &
         done
