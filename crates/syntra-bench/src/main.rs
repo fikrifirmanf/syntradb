@@ -60,7 +60,7 @@ fn command(command: &mut Command) -> Result<()> {
 }
 
 impl Cluster {
-    fn start(pg_bin: &Path, wal_init_zero: bool) -> Result<Self> {
+    fn start(pg_bin: &Path, wal_init_zero: bool, shared_buffers_mb: u64) -> Result<Self> {
         // Unix socket only, in a private short path. TempDir's random name is a
         // resource identifier; benchmark data and execution order are deterministic.
         let root = tempfile::Builder::new()
@@ -94,6 +94,9 @@ impl Cluster {
             "wal_init_zero = {}",
             if wal_init_zero { "on" } else { "off" }
         )?;
+        if shared_buffers_mb != 0 {
+            writeln!(config, "shared_buffers = '{shared_buffers_mb}MB'")?;
+        }
         let cluster = Self {
             root,
             pg_bin: pg_bin.to_owned(),
@@ -330,7 +333,11 @@ fn run_case(
 }
 
 fn run(options: &Options) -> Result<Value> {
-    let mut cluster = Cluster::start(&options.pg_bin, options.wal_init_zero)?;
+    let mut cluster = Cluster::start(
+        &options.pg_bin,
+        options.wal_init_zero,
+        options.shared_buffers_mb,
+    )?;
     let mut admin = cluster.connect("postgres")?;
     admin.batch_execute("CREATE DATABASE syntra_plain TEMPLATE template0")?;
     admin.batch_execute("CREATE DATABASE syntra_enabled TEMPLATE template0")?;

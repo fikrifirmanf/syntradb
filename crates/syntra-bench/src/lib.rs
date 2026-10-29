@@ -51,6 +51,8 @@ pub struct Options {
     pub offered_rate: u64,
     pub wait_sample_ms: u64,
     pub wal_init_zero: bool,
+    /// Zero keeps PostgreSQL's default `shared_buffers`.
+    pub shared_buffers_mb: u64,
     pub recovery_checks: bool,
     pub track_source: bool,
     pub trusted_stress_seconds: u64,
@@ -84,6 +86,7 @@ impl Options {
             offered_rate: 1000,
             wait_sample_ms: 0,
             wal_init_zero: true,
+            shared_buffers_mb: 0,
             recovery_checks: false,
             track_source: false,
             trusted_stress_seconds: 0,
@@ -114,6 +117,7 @@ impl Options {
                 "--offered-rate" => options.offered_rate = value.parse()?,
                 "--wait-sample-ms" => options.wait_sample_ms = value.parse()?,
                 "--wal-init-zero" => options.wal_init_zero = value.parse()?,
+                "--shared-buffers-mb" => options.shared_buffers_mb = value.parse()?,
                 "--recovery-checks" => options.recovery_checks = value.parse()?,
                 "--track-source" => options.track_source = value.parse()?,
                 "--trusted-stress-seconds" => options.trusted_stress_seconds = value.parse()?,
@@ -180,6 +184,9 @@ impl Options {
         }
         if options.mixed_seconds != 0 && options.rows < 2 {
             return Err("mixed transactions require at least two accounts".into());
+        }
+        if options.shared_buffers_mb != 0 && !(16..=16384).contains(&options.shared_buffers_mb) {
+            return Err("shared buffers must be zero or between 16 and 16384 MB".into());
         }
         if options.wait_sample_ms != 0 && !(5..=1000).contains(&options.wait_sample_ms) {
             return Err("wait sampling must be zero or between 5 and 1000 milliseconds".into());

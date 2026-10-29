@@ -764,6 +764,8 @@ pub(super) fn run(cluster: &Cluster, options: &Options) -> Result<Value> {
     for (actor, name) in actors {
         let mut client = cluster.connect("syntra_enabled")?;
         client.batch_execute("SET statement_timeout='15s'; SET lock_timeout='250ms'; SET idle_in_transaction_session_timeout='20s'")?;
+        // Names are fixed actor labels; they let a profiler find each backend.
+        client.batch_execute(&format!("SET application_name='{name}'"))?;
         if matches!(actor, Actor::Vacuum) {
             client.batch_execute("SET statement_timeout='60s'; SET lock_timeout='5s'")?;
         }
