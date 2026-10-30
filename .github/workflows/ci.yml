@@ -1,5 +1,20 @@
 name: Rust and PostgreSQL
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore:
+      - '**/*.md'
+      - 'fuzz/**'
+      - '.github/workflows/fuzz.yml'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'fuzz/**'
+      - '.github/workflows/fuzz.yml'
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-24.04

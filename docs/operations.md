@@ -8,8 +8,9 @@ hardware before relying on it.
 ## Before enabling capture
 
 - Run `bash scripts/check.sh` on the build you install. It has passed on macOS
-  arm64, and on Ubuntu 24.04 arm64 and x86_64. The x86_64 run was emulated on
-  an arm64 Mac, not run on x86_64 hardware.
+  arm64 and Ubuntu 24.04 arm64 and x86_64. A native GitHub-hosted x86_64 run
+  passed 193 PostgreSQL tests at commit `1baa167`; see the
+  [verification record](verification-2026-10-31.md).
 - Capture accepts permanent heap tables with one int2, int4 or int8 primary key
   and one int2, int4, int8 or `numeric(p,s)` value column, with p ≤ 18. See
   [transactional capture](transactional-capture.md) for the full list of
@@ -31,6 +32,8 @@ events. There are two ways to run it:
 - The opt-in [background worker](background-maintenance.md), one per listed
   database and at most 8. It needs `shared_preload_libraries` and a restart.
   One 600-second run at 200 transactions per second kept one feed drained.
+  Each source transaction has a one-second lock timeout so a source DDL lock
+  cannot block unrelated feeds indefinitely.
 - A scheduled call from a client session, as a superuser, in a writable read
   committed transaction.
 
@@ -85,9 +88,11 @@ explicit. SyntraDB never drops events on its own to admit a write.
 ## Upgrades
 
 Install the new library, then run `ALTER EXTENSION syntradb UPDATE` in every
-database that has the extension. Upgrades from 0.1.0, 0.2.0 and 0.3.0 to 0.4.0
-are checked. A downgrade from 0.4.0 to 0.3.0 refuses while a `numeric` feed
-exists. See [upgrades](upgrades.md).
+database that has the extension. Local checks cover upgrades from 0.1.0 through
+0.6.0 to 0.7.0. Downgrade checks cover 0.7.0 to 0.6.0 and earlier supported
+paths. A downgrade from 0.4.0 to 0.3.0 refuses while a `numeric` feed exists.
+See [upgrades](upgrades.md) and the current
+[verification record](verification-2026-10-31.md).
 
 ## Not covered
 

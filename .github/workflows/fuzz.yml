@@ -1,0 +1,69 @@
+name: Storage decoder fuzzing
+
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Fuzz duration in seconds
+        type: choice
+        options: ['3600', '300']
+        default: '3600'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  parsers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      FUZZ_SECONDS: ${{ inputs.seconds }}
+      RUSTUP_TOOLCHAIN: nightly-2026-10-30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install pinned fuzz toolchain
+        run: |
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+          cargo install cargo-fuzz --version 0.12.0 --locked --root .tools/fuzz
+      - name: Record source and compiler
+        run: |
+          mkdir -p benchmarks/results/fuzz
+          {
+            git rev-parse HEAD
+            rustc --version --verbose
+            .tools/fuzz/bin/cargo-fuzz --version
+            uname -a
+          } | tee benchmarks/results/fuzz/environment.txt
+      - name: Seed and build decoder fuzz target
+        run: |
+          python3 fuzz/seed_corpus.py
+          cargo fetch --locked --manifest-path fuzz/Cargo.toml
+          CARGO_NET_OFFLINE=true .tools/fuzz/bin/cargo-fuzz fuzz build parsers
+          git diff --exit-code -- fuzz/Cargo.lock
+      - name: Fuzz decoders with AddressSanitizer
+        timeout-minutes: 65
+        run: |
+          CARGO_NET_OFFLINE=true .tools/fuzz/bin/cargo-fuzz fuzz run parsers -- \
+            -max_total_time="$FUZZ_SECONDS" -timeout=10 -rss_limit_mb=2048 \
+            -max_len=65536 -seed=20261031 \
+            2>&1 | tee benchmarks/results/fuzz/parsers.log
+      - name: Save fuzz evidence and crash inputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storage-fuzz-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            benchmarks/results/fuzz/
+            fuzz/artifacts/
+            fuzz/corpus/
+          retention-days: 7
