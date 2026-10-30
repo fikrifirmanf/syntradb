@@ -1,0 +1,73 @@
+name: Checkpoint soak benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: Soak duration in seconds (snapshot held for the first half)
+        type: choice
+        options:
+          - '7200'
+          - '1200'
+        default: '7200'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checkpoint-soak-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  soak:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      SOAK_SECONDS: ${{ inputs.duration }}
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Record source and runner
+        run: |
+          mkdir -p benchmarks/results/actions
+          {
+            git rev-parse HEAD
+            uname -a
+            lscpu
+            free -h
+            df -h
+            rustup show
+            printf 'Runner image: %s %s\n' "$ImageOS" "$ImageVersion"
+            printf 'Run: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf 'Soak seconds: %s\n' "$SOAK_SECONDS"
+          } 2>&1 | tee benchmarks/results/actions/environment.txt
+      - name: Install PostgreSQL build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libicu-dev libreadline-dev zlib1g-dev libssl-dev libclang-dev clang bison flex
+      - name: Build project-local PostgreSQL and pgrx
+        timeout-minutes: 90
+        run: bash scripts/setup.sh 2>&1 | tee benchmarks/results/actions/setup.log
+      - name: Run production checkpoint soak
+        timeout-minutes: 185
+        run: |
+          vmstat -t 60 > benchmarks/results/actions/load.log &
+          monitor_pid=$!
+          trap 'kill "$monitor_pid" 2>/dev/null || true' EXIT
+          timeout --signal=TERM --kill-after=60s 180m \
+            bash scripts/checkpoint-soak.sh \
+              --checkpoint-soak-seconds "$SOAK_SECONDS" \
+              --checkpoint-column-type int4 \
+              --recovery-checks true \
+              --output benchmarks/results/actions/checkpoint-soak.json \
+            2>&1 | tee benchmarks/results/actions/checkpoint-soak.log
+      - name: Save benchmark logs and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-soak-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmarks/results/actions/
+          if-no-files-found: warn
+          retention-days: 7

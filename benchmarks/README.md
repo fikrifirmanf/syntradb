@@ -1,5 +1,8 @@
 # Reproducible SQL baseline
 
+For a manually triggered Linux checkpoint soak, see the
+[GitHub Actions instructions](github-actions.md).
+
 For the assertion-disabled build and concurrent transfer workload, use the
 [optimized and mixed workload harness](production-and-mixed.md).
 
