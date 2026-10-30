@@ -21,7 +21,7 @@ To run locally, install the pinned tools and seed the corpus:
 
 ```sh
 rustup toolchain install nightly-2026-10-30 --profile minimal
-cargo install cargo-fuzz --version 0.12.0 --locked --root .tools/fuzz
+cargo +1.99.0 install cargo-fuzz --version 0.12.0 --locked --root .tools/fuzz
 python3 fuzz/seed_corpus.py
 cargo fetch --locked --manifest-path fuzz/Cargo.toml
 RUSTUP_TOOLCHAIN=nightly-2026-10-30 CARGO_NET_OFFLINE=true \

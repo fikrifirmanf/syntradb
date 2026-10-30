@@ -34,7 +34,8 @@ jobs:
       - name: Install pinned fuzz toolchain
         run: |
           rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
-          cargo install cargo-fuzz --version 0.12.0 --locked --root .tools/fuzz
+          rustup toolchain install 1.99.0 --profile minimal
+          cargo +1.99.0 install cargo-fuzz --version 0.12.0 --locked --root .tools/fuzz
       - name: Record source and compiler
         run: |
           mkdir -p benchmarks/results/fuzz
