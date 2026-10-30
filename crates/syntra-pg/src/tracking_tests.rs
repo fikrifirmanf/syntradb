@@ -92,6 +92,26 @@ fn tracking_fails_closed_if_its_private_registration_disappears() {
 }
 
 #[pg_test]
+fn tracking_missing_registration_uses_prerequisite_sqlstate_and_rolls_back() {
+    Spi::run("CREATE TABLE tracked_missing_state (v int4); SELECT syntra_track_source('tracked_missing_state', 'v'); DELETE FROM syntra.tracked_sources WHERE source_relation = 'tracked_missing_state'::regclass::oid").unwrap();
+    Spi::run(
+        r#"DO $check$ BEGIN
+            BEGIN
+                INSERT INTO tracked_missing_state (v) VALUES (1);
+            EXCEPTION WHEN SQLSTATE '55000' THEN
+                RETURN;
+            END;
+            RAISE EXCEPTION 'missing registration accepted a source write';
+        END $check$"#,
+    )
+    .unwrap();
+    assert_eq!(
+        Spi::get_one::<i64>("SELECT count(*) FROM tracked_missing_state").unwrap(),
+        Some(0)
+    );
+}
+
+#[pg_test]
 fn tracking_installs_on_quoted_identifiers_without_dynamic_sql() {
     Spi::run(r#"CREATE TABLE "tracked'; odd" ("value'" int4)"#).unwrap();
     assert!(

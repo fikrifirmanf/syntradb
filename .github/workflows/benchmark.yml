@@ -67,6 +67,20 @@ jobs:
               --recovery-checks true \
               --output benchmarks/results/actions/checkpoint-soak.json \
             2>&1 | tee benchmarks/results/actions/checkpoint-soak.log
+      - name: Verify completed soak report
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path('benchmarks/results/actions/checkpoint-soak.json').read_text())
+          stress = report['checkpoint_stress']
+          if stress['duration_seconds'] != int(os.environ['SOAK_SECONDS']) or stress['soak'] is None:
+              raise SystemExit('The report does not contain the requested completed soak')
+          if stress['unexpected_errors'] != 0 or stress['invariant_failures'] != 0:
+              raise SystemExit('The completed soak reported correctness failures')
+          PY
       - name: Save benchmark logs and report
         if: always()
         uses: actions/upload-artifact@v4

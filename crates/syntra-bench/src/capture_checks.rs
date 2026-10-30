@@ -413,10 +413,16 @@ pub(super) fn recovery(cluster: &mut Cluster) -> Result<Value> {
         .execute("UPDATE capture_check SET v=13 WHERE id=1", &[])
         .err()
         .ok_or("restored source wrote before capture reseed")?;
-    require(
-        denied.code().is_some_and(|c| c.code() == "55000"),
-        "restore capture denial had an unexpected SQLSTATE",
-    )?;
+    if !denied.code().is_some_and(|c| c.code() == "55000") {
+        return Err(format!(
+            "restore capture denial expected SQLSTATE 55000, got {}: {}",
+            denied.code().map_or("none", |c| c.code()),
+            denied
+                .as_db_error()
+                .map_or("no database error message", |e| e.message())
+        )
+        .into());
+    }
     seed(&mut restored)?;
     restored.batch_execute("UPDATE capture_check SET v=13 WHERE id=1")?;
     require(

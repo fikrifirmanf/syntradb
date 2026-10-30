@@ -35,7 +35,9 @@ fn syntra_source_changed<'a>(
         &[relation.into(), trigger_oid.into(), shard.into()],
     )?;
     if updated != Some(1) {
-        pgrx::error!(
+        pgrx::ereport!(
+            ERROR,
+            pgrx::PgSqlErrorCode::ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE,
             "source tracking registration is missing; stop writes and repair the registration"
         );
     }
