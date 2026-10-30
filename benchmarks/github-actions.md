@@ -39,6 +39,14 @@ Start **Actions → Recovery and lifecycle verification → Run workflow** to ru
 21 independent checks on Ubuntu 24.04 x86_64. Four jobs run at a time. A failed
 job does not cancel the other checks.
 
+Leave the check input at `all` for the full suite. To repeat one case, enter its
+job name, such as `quorum-numeric`. Unknown names fail before starting any checks.
+For example:
+
+```sh
+gh workflow run readiness.yml --ref main -f check=quorum-numeric
+```
+
 - Process crash and logical restore checks.
 - Background maintenance, busy locks and broken-source isolation.
 - Physical backup and point-in-time restore with four writers across two feeds,

@@ -2,6 +2,11 @@ name: Recovery and lifecycle verification
 
 on:
   workflow_dispatch:
+    inputs:
+      check:
+        description: Check name, or all
+        type: string
+        default: all
 
 permissions:
   contents: read
@@ -11,11 +16,44 @@ defaults:
     shell: bash
 
 concurrency:
-  group: readiness-${{ github.ref }}
+  group: readiness-${{ github.ref }}-${{ inputs.check }}
   cancel-in-progress: false
 
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      checks: ${{ steps.select.outputs.checks }}
+    steps:
+      - id: select
+        env:
+          SELECTED_CHECK: ${{ inputs.check }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          checks = [
+              'recovery', 'maintenance',
+              'restore-int2', 'restore-int4', 'restore-int8', 'restore-numeric',
+              'replica-int2', 'replica-int4', 'replica-int8', 'replica-numeric',
+              'topology-int4', 'topology-numeric',
+              'quorum-int4', 'quorum-numeric',
+              'upgrade-0.1.0', 'upgrade-0.2.0', 'upgrade-0.3.0',
+              'upgrade-0.4.0', 'upgrade-0.5.0', 'upgrade-0.6.0',
+              'downgrade-0.7.0',
+          ]
+          selected = os.environ['SELECTED_CHECK']
+          if selected != 'all':
+              if selected not in checks:
+                  raise SystemExit(f'Unknown verification check: {selected}')
+              checks = [selected]
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write('checks=' + json.dumps(checks) + '\n')
+          PY
   verify:
+    needs: plan
     name: ${{ matrix.check }}
     runs-on: ubuntu-24.04
     timeout-minutes: 150
@@ -23,28 +61,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        check:
-          - recovery
-          - maintenance
-          - restore-int2
-          - restore-int4
-          - restore-int8
-          - restore-numeric
-          - replica-int2
-          - replica-int4
-          - replica-int8
-          - replica-numeric
-          - topology-int4
-          - topology-numeric
-          - quorum-int4
-          - quorum-numeric
-          - upgrade-0.1.0
-          - upgrade-0.2.0
-          - upgrade-0.3.0
-          - upgrade-0.4.0
-          - upgrade-0.5.0
-          - upgrade-0.6.0
-          - downgrade-0.7.0
+        check: ${{ fromJSON(needs.plan.outputs.checks) }}
     env:
       CHECK: ${{ matrix.check }}
       CARGO_TERM_COLOR: never
