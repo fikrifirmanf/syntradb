@@ -10,7 +10,7 @@ earlier correctness or recovery requirement.
 | Gate | Evidence | Work still needed |
 |---|---|---|
 | Build | Pinned Rust and PostgreSQL builds; the full check passes on macOS arm64 and native Ubuntu 24.04 x86_64 (194 PostgreSQL tests at commit `7b3609f`; see [verification](verification-2026-10-31.md)); earlier 0.4.0 checks passed in Ubuntu containers on arm64 and emulated x86_64 | Packages and more supported platforms |
-| SQL | Nullable int4 matches PostgreSQL; capture feeds with int2, int4 or int8 keys and int2, int4, int8 or `numeric(p,s)` (p ≤ 18) values match PostgreSQL's aggregates, including sums past the `bigint` range | Other types, `numeric` keys and precision above 18, the cause of one failed `numeric` soak (twelve of thirteen passed), and bounded grouping |
+| SQL | Nullable int4 matches PostgreSQL; capture feeds with int2, int4 or int8 keys and int2, int4, int8 or `numeric(p,s)` (p ≤ 18) values match PostgreSQL's aggregates, including sums past the `bigint` range | Other types, `numeric` keys and precision above 18, the cause of one failed `numeric` soak (twelve of thirteen passed), and SQL integration of bounded grouping |
 | Visibility | Fresh scans and explicit trusted reuse | Broader types and snapshot stress |
 | Access | Source ACL and catalog owner tests | Broader role and DDL checks |
 | Integrity | Checksums and malformed input tests | Long fuzz runs and format upgrades |

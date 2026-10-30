@@ -53,11 +53,13 @@ These runs target `7b3609f`:
 - [Recovery and lifecycle checks](https://github.com/fikrifirmanf/syntradb/actions/runs/41133228732),
   covering 21 cases. See the [workflow contract](../benchmarks/github-actions.md).
 
-Completed cases so far include crash/logical recovery and physical backup with
-point-in-time restore for `int2` and `int4`, each with four writers across two
-feeds. The backups overlapped 569 and 577 captured events, respectively. Both
-restore targets matched the primary's expected state and resumed capture and
-maintenance. Other cases remain pending.
+Twelve cases have passed so far: crash/logical recovery, maintenance, physical
+backup and point-in-time restore for all four layouts, standby reads and promotion
+for all four layouts, and cascading failover with rewind for `int4` and `numeric`.
+Each physical backup used four writers across two feeds. The `int2` and `int4`
+backups overlapped 569 and 577 captured events, respectively. Restore targets
+matched the primary's expected state and resumed capture and maintenance.
+Quorum, upgrades and downgrade remain pending.
 
 No completed two-hour result is claimed here. The earlier laptop run stopped at
 minute 103 after sleep and unrelated load disturbed it. Comparing 0.6.0 and 0.7.0
@@ -74,6 +76,27 @@ failures propagate through the harness.
 [The one-hour Linux run](https://github.com/fikrifirmanf/syntradb/actions/runs/41134171409)
 targets `5d6180c` and is pending. The fuzz driver is built with Rust 1.99.0;
 nightly is used for sanitizer instrumentation of the target.
+
+## Bounded grouped aggregates
+
+Commits `a6d0085` and `93053eb` add the standalone `int4` and `int8` grouping
+kernels. Thirteen focused tests pass, including independent PostgreSQL 18.6
+fixtures for 5,000 rows across 14 groups in each layout. They cover NULL keys and
+values, integer endpoints, wide sums, group limits and cancellation. The full
+local check still passes all 194 PostgreSQL tests. The
+[native CI run](https://github.com/fikrifirmanf/syntradb/actions/runs/41136019168)
+for the grouping commit is pending.
+
+The differential grouping fuzz target completed 2,129,264 local inputs in
+61 seconds without a mismatch. Inverting its result assertion failed immediately
+on a valid seed; restoring it passed. A
+[five-minute Linux run](https://github.com/fikrifirmanf/syntradb/actions/runs/41136545591)
+targets commit `2b010b5` and is pending. It compares the hash aggregation with an
+independent ordered-map oracle using direct arithmetic.
+
+These are Rust execution APIs. PostgreSQL continues to execute SQL GROUP BY;
+connecting the kernel to snapshot-correct SQL input remains work for a later change.
+See the [grouping contract](grouped-aggregates.md).
 
 ## Remaining release requirements
 
