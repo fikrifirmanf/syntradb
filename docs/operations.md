@@ -9,7 +9,7 @@ hardware before relying on it.
 
 - Run `bash scripts/check.sh` on the build you install. It has passed on macOS
   arm64 and Ubuntu 24.04 arm64 and x86_64. A native GitHub-hosted x86_64 run
-  passed 193 PostgreSQL tests at commit `1baa167`; see the
+  passed 194 PostgreSQL tests at commit `7b3609f`; see the
   [verification record](verification-2026-10-31.md).
 - Capture accepts permanent heap tables with one int2, int4 or int8 primary key
   and one int2, int4, int8 or `numeric(p,s)` value column, with p ≤ 18. See

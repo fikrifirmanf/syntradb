@@ -23,8 +23,11 @@ feed stayed pending for the full 30-second assertion window.
 
 [Run 41131634854](https://github.com/fikrifirmanf/syntradb/actions/runs/41131634854)
 passed the full check on Ubuntu 24.04 x86_64 at commit `1baa167`, including
-193 PostgreSQL tests. This supplies a native x86_64 baseline. The patched commit
-adds one SQLSTATE regression test and needs its own CI result.
+193 PostgreSQL tests. This supplies a native x86_64 baseline.
+
+[Run 41133222936](https://github.com/fikrifirmanf/syntradb/actions/runs/41133222936)
+then passed the full check on the corrected commit `7b3609f`, including all
+194 PostgreSQL integration tests.
 
 ## Rejected benchmark result
 
@@ -43,12 +46,18 @@ This run is invalid as performance or soak evidence.
 
 ## Runs on the corrected commit
 
-These runs target `7b3609f`; their results were pending when this record was started:
+These runs target `7b3609f`:
 
-- [Native Linux checks](https://github.com/fikrifirmanf/syntradb/actions/runs/41133222936).
-- [Two-hour checkpoint soak](https://github.com/fikrifirmanf/syntradb/actions/runs/41133224378).
+- [Native Linux checks](https://github.com/fikrifirmanf/syntradb/actions/runs/41133222936): passed.
+- [Two-hour checkpoint soak](https://github.com/fikrifirmanf/syntradb/actions/runs/41133224378): running.
 - [Recovery and lifecycle checks](https://github.com/fikrifirmanf/syntradb/actions/runs/41133228732),
   covering 21 cases. See the [workflow contract](../benchmarks/github-actions.md).
+
+Completed cases so far include crash/logical recovery and physical backup with
+point-in-time restore for `int2` and `int4`, each with four writers across two
+feeds. The backups overlapped 569 and 577 captured events, respectively. Both
+restore targets matched the primary's expected state and resumed capture and
+maintenance. Other cases remain pending.
 
 No completed two-hour result is claimed here. The earlier laptop run stopped at
 minute 103 after sleep and unrelated load disturbed it. Comparing 0.6.0 and 0.7.0
@@ -60,7 +69,11 @@ The new [decoder fuzz target](../fuzz/README.md) completed 11,453,700 inputs in
 61 seconds on macOS arm64 with AddressSanitizer and no failure. Inverting its
 checkpoint canonical-encoding assertion made a known fixture fail immediately;
 restoring the assertion made that fixture pass. This checks that assertion
-failures propagate through the harness. A longer native Linux run is still needed.
+failures propagate through the harness.
+
+[The one-hour Linux run](https://github.com/fikrifirmanf/syntradb/actions/runs/41134171409)
+targets `5d6180c` and is pending. The fuzz driver is built with Rust 1.99.0;
+nightly is used for sanitizer instrumentation of the target.
 
 ## Remaining release requirements
 
