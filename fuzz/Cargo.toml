@@ -11,10 +11,18 @@ cargo-fuzz = true
 libfuzzer-sys = "=0.4.10"
 crc32fast = "=1.5.3"
 syntra-storage = { path = "../crates/syntra-storage" }
+syntra-exec = { path = "../crates/syntra-exec" }
 
 [[bin]]
 name = "parsers"
 path = "fuzz_targets/parsers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "grouping"
+path = "fuzz_targets/grouping.rs"
 test = false
 doc = false
 bench = false

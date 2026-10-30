@@ -155,6 +155,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
+name = "syntra-core"
+version = "0.7.0"
+
+[[package]]
+name = "syntra-exec"
+version = "0.7.0"
+dependencies = [
+ "syntra-core",
+ "syntra-storage",
+]
+
+[[package]]
 name = "syntra-storage"
 version = "0.7.0"
 dependencies = [
@@ -168,6 +180,7 @@ version = "0.0.0"
 dependencies = [
  "crc32fast",
  "libfuzzer-sys",
+ "syntra-exec",
  "syntra-storage",
 ]
 

@@ -1,8 +1,13 @@
-name: Storage decoder fuzzing
+name: Storage and execution fuzzing
 
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: Fuzz target
+        type: choice
+        options: ['parsers', 'grouping']
+        default: 'parsers'
       seconds:
         description: Fuzz duration in seconds
         type: choice
@@ -17,15 +22,17 @@ defaults:
     shell: bash
 
 concurrency:
-  group: fuzz-${{ github.ref }}
+  group: fuzz-${{ github.ref }}-${{ inputs.target }}
   cancel-in-progress: false
 
 jobs:
-  parsers:
+  fuzz:
+    name: ${{ inputs.target }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       FUZZ_SECONDS: ${{ inputs.seconds }}
+      FUZZ_TARGET: ${{ inputs.target }}
       RUSTUP_TOOLCHAIN: nightly-2026-10-30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,25 +51,26 @@ jobs:
             rustc --version --verbose
             .tools/fuzz/bin/cargo-fuzz --version
             uname -a
+            printf 'Target: %s\nSeconds: %s\n' "$FUZZ_TARGET" "$FUZZ_SECONDS"
           } | tee benchmarks/results/fuzz/environment.txt
-      - name: Seed and build decoder fuzz target
+      - name: Seed and build fuzz target
         run: |
           python3 fuzz/seed_corpus.py
           cargo fetch --locked --manifest-path fuzz/Cargo.toml
-          CARGO_NET_OFFLINE=true .tools/fuzz/bin/cargo-fuzz fuzz build parsers
+          CARGO_NET_OFFLINE=true .tools/fuzz/bin/cargo-fuzz fuzz build "$FUZZ_TARGET"
           git diff --exit-code -- fuzz/Cargo.lock
-      - name: Fuzz decoders with AddressSanitizer
+      - name: Fuzz with AddressSanitizer
         timeout-minutes: 65
         run: |
-          CARGO_NET_OFFLINE=true .tools/fuzz/bin/cargo-fuzz fuzz run parsers -- \
+          CARGO_NET_OFFLINE=true .tools/fuzz/bin/cargo-fuzz fuzz run "$FUZZ_TARGET" -- \
             -max_total_time="$FUZZ_SECONDS" -timeout=10 -rss_limit_mb=2048 \
             -max_len=65536 -seed=20261031 \
-            2>&1 | tee benchmarks/results/fuzz/parsers.log
+            2>&1 | tee benchmarks/results/fuzz/fuzz.log
       - name: Save fuzz evidence and crash inputs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: storage-fuzz-${{ github.run_id }}-${{ github.run_attempt }}
+          name: fuzz-${{ inputs.target }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             benchmarks/results/fuzz/
             fuzz/artifacts/

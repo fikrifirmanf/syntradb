@@ -23,3 +23,19 @@ for tag, name in seeds:
     fixture = (fixtures / name).read_bytes()
     for mode in (0, 0x80):
         (corpus / f"{mode}-{name}").write_bytes(bytes([tag | mode]) + fixture)
+
+grouping_corpus = fuzz_root / "corpus/grouping"
+grouping_corpus.mkdir(parents=True, exist_ok=True)
+for wide in (0, 1):
+    rows = bytearray()
+    for n in range(128):
+        key = n % 13 - 6 + (5_000_000_000 if wide else 0)
+        value = (n * 7919) % 100003 - 50001
+        if wide:
+            value = value * 1_000_000_000_000 + 3_000_000_000_000_000_000
+        flags = 4 | (1 if n % 17 == 0 else 0) | (2 if n % 7 == 0 else 0)
+        rows.append(flags)
+        rows.extend(key.to_bytes(8, "little", signed=True))
+        rows.extend(value.to_bytes(8, "little", signed=True))
+    for limit in (0, 1, 16, 64):
+        (grouping_corpus / f"{wide}-{limit}").write_bytes(bytes([wide, limit]) + rows)

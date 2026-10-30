@@ -1,11 +1,12 @@
-# Storage decoder fuzzing
+# Storage and grouping fuzzing
 
-The `Storage decoder fuzzing` GitHub workflow runs libFuzzer with AddressSanitizer
-for one hour by default. Choose 300 seconds for a smoke run. The workflow pins
+The `Storage and execution fuzzing` GitHub workflow runs libFuzzer with AddressSanitizer
+for one hour by default. Choose 300 seconds for a smoke run. Select `parsers` for
+decoders or `grouping` for integer grouped aggregates. The workflow pins
 cargo-fuzz 0.12.0, libfuzzer-sys 0.4.10 and nightly-2026-10-30, and records the
 source commit and compiler in its artifact.
 
-The target covers nullable `int4` and `int8` segments; checkpoints and partition
+The `parsers` target covers nullable `int4` and `int8` segments; checkpoints and partition
 deltas for `int4`, `int8` and mixed `int4` keys with `int8` values; and both
 manifest versions. It starts from the storage tests' independent binary fixtures.
 One input bit selects checksum repair for checkpoints, deltas and manifests.
@@ -16,6 +17,12 @@ Every accepted checkpoint, delta or manifest must re-encode to identical canonic
 bytes. Accepted segments must expose their declared row count through their groups.
 Panics, sanitizer failures, noncanonical accepted encodings and row-count mismatches
 fail the run. Decoder errors are expected rejections.
+
+The `grouping` target compares both integer grouping paths with an independent
+ordered-map oracle using direct arithmetic. Inputs exercise nullable keys and
+values, repeated and distinct keys, wide sums and group limits from 0 to 255.
+The deterministic tests separately cover the full 65,536-group boundary.
+The oracle checks exact ordered results or the expected limit error.
 
 To run locally, install the pinned tools and seed the corpus:
 
