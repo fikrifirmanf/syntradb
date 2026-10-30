@@ -22,6 +22,7 @@ esac
 set -euo pipefail
 SYNTRA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SYNTRA_ROOT"
+source scripts/lib/ack-counter.sh
 bash scripts/setup-production.sh
 export PGRX_HOME="$SYNTRA_ROOT/.pgrx"
 export PATH="$SYNTRA_ROOT/.tools/bin:$PATH"
@@ -87,8 +88,12 @@ follow() {
     printf "primary_conninfo = 'host=%s port=%s user=quorum application_name=%s'\n" "$SOCKET" "$2" "$3" >>"$1/postgresql.auto.conf"
 }
 acked() {
-    local total=0 w
-    for w in $(seq 1 "$WRITER_COUNT"); do total=$((total + $(cat "$WORK/acked-$w"))); done
+    local total=0 w count
+    for w in $(seq 1 "$WRITER_COUNT"); do
+        count="$(cat "$WORK/acked-$w")"
+        [[ "$count" =~ ^(0|[1-9][0-9]*)$ ]] || fail "invalid acknowledgement counter for writer $w"
+        total=$((total + count))
+    done
     echo "$total"
 }
 
@@ -124,10 +129,14 @@ writer() {
         id=$((RANDOM % 5000 + 1))
         # unslop-ignore NO_SQL_INTERPOLATION -- id is integer arithmetic on $RANDOM, set just above; STEP a literal chosen at the top.
         sql="UPDATE feed SET v = v + $STEP WHERE id = $id"
-        if "$BIN/psql" -h "$SOCKET" -p "$PRIMARY" -U quorum -d feeds -v ON_ERROR_STOP=1 -AtqX -c "$sql" >/dev/null 2>&1; then
+        if "$BIN/psql" -h "$SOCKET" -p "$PRIMARY" -U quorum -d feeds -v ON_ERROR_STOP=1 -AtqX -c "$sql" >/dev/null 2>>"$WORK/writer-$1.log"; then
             ok=$((ok + 1))
-            echo "$ok" >"$WORK/acked-$1"
+            syntra_publish_ack "$WORK/acked-$1" "$ok" || return
         else
+            if [[ ! -e "$WORK/primary-stopping" ]]; then
+                echo "quorum writer $1 failed before the primary shutdown; see $WORK/writer-$1.log" >&2
+                return 1
+            fi
             break
         fi
     done
@@ -177,9 +186,10 @@ STALLED=$(( $(acked) - BEFORE ))
 ((STALLED > 0)) || fail "no write was acknowledged with $STALL standby stalled"
 
 # Fail over with writes in flight, losing the primary and the most advanced standby.
+touch "$WORK/primary-stopping"
 kill_node "$WORK/primary"
 touch "$WORK/stop-writers"
-for pid in ${WRITER_PIDS[@]+"${WRITER_PIDS[@]}"}; do wait "$pid" || true; done
+for pid in ${WRITER_PIDS[@]+"${WRITER_PIDS[@]}"}; do wait "$pid"; done
 WRITER_PIDS=()
 ACKED=$(acked)
 # unslop-ignore NO_SQL_INTERPOLATION -- constant SQL; only the port argument varies.

@@ -3,3 +3,4 @@
 /.pgrx/
 .DS_Store
 /benchmarks/results/
+__pycache__/

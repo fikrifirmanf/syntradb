@@ -68,7 +68,7 @@ The development baseline is PostgreSQL 18.6 and pgrx/cargo-pgrx 0.19.3. This is 
 currently tested baseline, not a commitment to support every PostgreSQL release.
 The project license remains undecided; Cargo packages are not published.
 
-Install a C/C++ compiler, make, pkg-config, ICU development headers, libclang,
+Install Python 3, a C/C++ compiler, make, pkg-config, ICU development headers, libclang,
 curl, tar and shasum. PostgreSQL builds may also require bison, flex and readline
 development headers on your platform. On macOS, setup finds Homebrew's ICU path.
 On Linux, install the equivalent development packages through your package manager.

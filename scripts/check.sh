@@ -2,6 +2,7 @@
 set -euo pipefail
 SYNTRA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SYNTRA_ROOT"
+python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 cargo fmt --all -- --check
 rustfmt --edition 2021 --check crates/syntra-pg/src/source_tests.rs
 rustfmt --edition 2021 --check crates/syntra-pg/src/projection_tests.rs
