@@ -51,6 +51,9 @@ what is and is not bounded, with a snapshot age policy.
 
 ## Build the standalone engine
 
+The standalone engine includes a [bounded integer grouping kernel](docs/grouped-aggregates.md),
+with PostgreSQL-generated aggregate fixtures and cancellation checks.
+
 The toolchain file pins Rust 1.99.0. Cargo's default workspace members exclude the
 PostgreSQL adapter so the engine can be developed without PostgreSQL installed.
 

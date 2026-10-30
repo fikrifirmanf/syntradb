@@ -1,9 +1,12 @@
-//! Streaming execution prototype. No PostgreSQL APIs or input-sized allocations.
+//! Streaming execution kernels with bounded state and no PostgreSQL APIs.
 #![forbid(unsafe_code)]
 
 use std::fmt;
 use syntra_core::{AggregateError, Int4Summary};
 use syntra_storage::{Int4Group, Int4Segment, SegmentError};
+
+mod grouping;
+pub use grouping::{group_int4, GroupedInt4Summary, GroupingError, MAX_GROUPS};
 
 pub const INTERRUPT_INTERVAL: usize = 1024;
 
