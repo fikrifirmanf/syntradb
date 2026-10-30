@@ -24,6 +24,11 @@ lag read.
 
 - If another session holds the maintenance lock, for example a manual apply, the
   worker skips that source until the next pass.
+- Each source transaction sets a one-second `lock_timeout`. A source's DDL lock
+  or another conflicting lock cannot leave the worker waiting indefinitely.
+  On timeout the source's work rolls back, and the worker moves to the next
+  source. The setting applies separately to each lock acquisition, rather than
+  bounding the whole apply. Client sessions keep their own timeout settings.
 - Any other error on one source is logged as
   `WARNING: syntradb maintenance skipped relation <oid>: <reason>` and the worker
   moves on to the next source. The warning repeats every pass until the source is
@@ -56,6 +61,10 @@ worker at a 200 ms interval and checks that it:
   with nobody calling apply, ending at a checkpoint read that matches the heap;
 - leaves events pending while another session holds the maintenance lock, then
   drains them once the lock is released;
+- drains an unrelated feed while an earlier source holds an exclusive DDL lock,
+  then drains the locked source after the lock is released;
+- exits after SIGTERM received during a source lock wait, and starts again after
+  the server restarts;
 - keeps draining one feed while a second feed's tampered binding fails on every
   pass, and logs a warning naming the broken source;
 - did not exit after it first connected, and logs a clean stop at shutdown;

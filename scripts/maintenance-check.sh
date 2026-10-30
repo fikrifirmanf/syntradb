@@ -22,7 +22,16 @@ printf "\nlisten_addresses = ''\nunix_socket_directories = '%s'\nport = 28935\n"
 printf "shared_preload_libraries = 'syntradb'\n" >>"$DATA/postgresql.conf"
 LOG="$WORK/postgres.log"
 "$BIN/pg_ctl" -D "$DATA" -l "$LOG" -w -t 60 start >/dev/null
-trap '"$BIN/pg_ctl" -D "$DATA" -w -t 30 stop -m fast >/dev/null 2>&1 || true' EXIT
+SOURCE_HOLDER=""
+cleanup() {
+    if [[ -n "$SOURCE_HOLDER" ]]; then
+        printf 'ROLLBACK;\n\\q\n' >&3
+        exec 3>&-
+        wait "$SOURCE_HOLDER" || true
+    fi
+    "$BIN/pg_ctl" -D "$DATA" -w -t 30 stop -m fast >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 q() { "$BIN/psql" -h "$SOCKET" -p 28935 -U maint -d "${DB:-feeds}" -v ON_ERROR_STOP=1 -AtqX -c "$1"; }
 fail() {
     echo "maintenance check failed: $1" >&2
@@ -83,6 +92,50 @@ wait_for "drain beside a broken source" "$DRAINED" "t"
 BROKEN="$(q "SELECT 'broken'::regclass::oid")"
 grep -q "syntradb maintenance skipped relation $BROKEN" "$LOG" || fail "no warning for the broken source"
 
+# A source DDL lock must not hold up unrelated sources. Keep the lock holder's
+# transaction open through a FIFO, and synchronize on pg_locks, not elapsed time.
+q "CREATE TABLE ddl_blocked(id int4 PRIMARY KEY,v int4); INSERT INTO ddl_blocked VALUES(1,1)"
+q "SELECT syntra_seed_capture('ddl_blocked','id','v',64)" >/dev/null
+q "CREATE TABLE ddl_healthy(id int4 PRIMARY KEY,v int4); INSERT INTO ddl_healthy VALUES(1,1)"
+q "SELECT syntra_seed_capture('ddl_healthy','id','v',64)" >/dev/null
+mkfifo "$WORK/source-lock.sql"
+exec 3<>"$WORK/source-lock.sql"
+"$BIN/psql" -h "$SOCKET" -p 28935 -U maint -d feeds -v ON_ERROR_STOP=1 -AtqX \
+    -f "$WORK/source-lock.sql" 3>&- >"$WORK/source-lock.log" 2>&1 &
+SOURCE_HOLDER=$!
+printf 'BEGIN; LOCK TABLE ddl_blocked IN ACCESS EXCLUSIVE MODE;\n' >&3
+wait_for "source DDL lock acquired" \
+    "SELECT count(*) FROM pg_locks WHERE relation='ddl_blocked'::regclass AND mode='AccessExclusiveLock' AND granted" "1"
+q "UPDATE ddl_healthy SET v=9 WHERE id=1"
+wait_for "unrelated feed drains beside a source DDL lock" \
+    "SELECT applied IS NOT NULL AND pending_events=0 FROM syntra_capture_lag('ddl_healthy')" "t"
+[[ "$(q "SELECT route||':'||sum FROM syntra_checkpoint_int4_summary('ddl_healthy','v')")" == "checkpoint:9" ]] \
+    || fail "unrelated feed checkpoint did not reflect the write"
+# Signal the worker during a real lock wait. Checking SIGTERM between sources
+# must end the whole worker, rather than consuming the flag and starting a pass.
+wait_for "worker waiting on the source DDL lock" \
+    "SELECT count(*) FROM pg_stat_activity WHERE backend_type='syntradb maintenance' AND wait_event_type='Lock'" "1"
+WORKER_PID="$(q "SELECT pid FROM pg_stat_activity WHERE backend_type='syntradb maintenance'")"
+[[ "$WORKER_PID" =~ ^[0-9]+$ ]] || fail "invalid maintenance worker PID"
+# unslop-ignore NO_SQL_INTERPOLATION -- WORKER_PID is a catalog PID validated as digits above.
+[[ "$(q "SELECT pg_terminate_backend($WORKER_PID)")" == "t" ]] || fail "could not signal the worker"
+# unslop-ignore NO_SQL_INTERPOLATION -- WORKER_PID is a catalog PID validated as digits above.
+wait_for "worker stops after SIGTERM during a source lock wait" \
+    "SELECT count(*) FROM pg_stat_activity WHERE pid=$WORKER_PID" "0"
+printf 'ROLLBACK;\n\\q\n' >&3
+exec 3>&-
+wait "$SOURCE_HOLDER"
+SOURCE_HOLDER=""
+"$BIN/pg_ctl" -D "$DATA" -w -t 30 stop -m fast >/dev/null
+"$BIN/pg_ctl" -D "$DATA" -l "$LOG" -w -t 60 start >/dev/null
+wait_for "worker starts after the shutdown check" \
+    "SELECT count(*) FROM pg_stat_activity WHERE backend_type='syntradb maintenance'" "1"
+q "UPDATE ddl_blocked SET v=7 WHERE id=1"
+wait_for "locked feed drains after DDL releases it" \
+    "SELECT applied IS NOT NULL AND pending_events=0 FROM syntra_capture_lag('ddl_blocked')" "t"
+[[ "$(q "SELECT route||':'||sum FROM syntra_checkpoint_int4_summary('ddl_blocked','v')")" == "checkpoint:7" ]] \
+    || fail "released feed checkpoint did not reflect the write"
+
 if tail -n +"$RUNNING_FROM" "$LOG" | grep -q "syntradb maintenance.*exited with exit code"; then
     fail "the worker exited during the run"
 fi
@@ -113,4 +166,4 @@ if "$BIN/pg_ctl" -D "$DATA" -l "$LOG" -w -t 30 start >/dev/null 2>&1; then
 fi
 grep -q "invalid syntradb.maintenance_database: database listed twice" "$LOG" \
     || fail "no error for a database listed twice"
-echo "maintenance check passed: worker drained a feed, skipped a held lock, isolated a broken source, stopped cleanly, ran one worker per listed database and refused a malformed list; work dir $WORK"
+echo "maintenance check passed: worker drained feeds, skipped held maintenance and source DDL locks, isolated a broken source, exited on SIGTERM during a lock wait, restarted cleanly, ran one worker per listed database and refused a malformed list; work dir $WORK"

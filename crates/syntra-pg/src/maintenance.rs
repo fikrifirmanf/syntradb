@@ -109,7 +109,9 @@ pub extern "C-unwind" fn syntra_maintenance_main(_arg: pg_sys::Datum) {
     let database = BackgroundWorker::get_extra().to_owned();
     BackgroundWorker::connect_worker_to_spi(Some(&database), None);
     log!("syntradb maintenance started in database \"{}\"", database);
-    while BackgroundWorker::wait_latch(Some(Duration::from_millis(INTERVAL_MS.get() as u64))) {
+    'worker: while BackgroundWorker::wait_latch(Some(Duration::from_millis(
+        INTERVAL_MS.get() as u64
+    ))) {
         if BackgroundWorker::sighup_received() {
             // SAFETY: the worker's main loop, outside any transaction.
             unsafe { pg_sys::ProcessConfigFile(pg_sys::GucContext::PGC_SIGHUP) };
@@ -141,9 +143,17 @@ pub extern "C-unwind" fn syntra_maintenance_main(_arg: pg_sys::Datum) {
         });
         for source in sources {
             if BackgroundWorker::sigterm_received() {
-                break;
+                // This accessor consumes the signal flag. Exit the outer loop
+                // as well, so wait_latch cannot miss the shutdown request.
+                break 'worker;
             }
             BackgroundWorker::transaction(|| {
+                // The PgRelation argument adapter can wait on a source's DDL
+                // lock before maintenance admission runs. Bound every lock wait
+                // in this transaction so one source cannot starve the others.
+                // PostgreSQL reports a lock timeout as lock_not_available;
+                // maintain_sql catches it and rolls back that source's work.
+                Spi::run("SET LOCAL lock_timeout = '1s'").unwrap_or_else(|e| pgrx::error!("{}", e));
                 // unslop-ignore NO_SQL_INTERPOLATION -- the only value is a catalog OID formatted as an integer; DO takes no bind parameters.
                 Spi::run(&maintain_sql(source)).unwrap_or_else(|e| pgrx::error!("{}", e));
             });
