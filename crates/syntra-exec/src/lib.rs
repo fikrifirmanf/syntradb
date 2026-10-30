@@ -6,7 +6,10 @@ use syntra_core::{AggregateError, Int4Summary};
 use syntra_storage::{Int4Group, Int4Segment, SegmentError};
 
 mod grouping;
-pub use grouping::{group_int4, GroupedInt4Summary, GroupingError, MAX_GROUPS};
+pub use grouping::{
+    group_int4, group_int8, GroupedInt4Summary, GroupedInt8Summary, GroupedSummary, GroupingError,
+    MAX_GROUPS,
+};
 
 pub const INTERRUPT_INTERVAL: usize = 1024;
 

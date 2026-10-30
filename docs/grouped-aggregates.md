@@ -1,7 +1,9 @@
 # Bounded integer grouping kernel
 
-`syntra_exec::group_int4` streams nullable integer keys and values into grouped
-COUNT, SUM, MIN and MAX summaries. It retains group state rather than input rows.
+`syntra_exec::group_int4` and `group_int8` stream nullable integer keys and values
+into grouped COUNT, SUM, MIN and MAX summaries. They retain group state rather
+than input rows. The `int8` path keeps sums in `i128`, including results beyond
+the `bigint` range, matching PostgreSQL's `sum(bigint)` numeric results.
 The SQL planner uses PostgreSQL's existing GROUP BY implementation. This Rust
 entry point will support a later analytical route.
 
@@ -45,19 +47,25 @@ the original pinned snapshot and discard the failed attempt's state.
 
 ```sh
 cargo test --locked -p syntra-exec --test grouping
+cargo test --locked -p syntra-exec --test grouping_int8
 ```
 
 Tests cover empty input, NULL keys, NULL-only groups, negative keys, integer
 endpoints, every admitted group slot, invalid limits, early stream termination
-and cancellation. An independent PostgreSQL 18.6 oracle supplies expected results
-for 5,000 rows across 14 groups. Forward and reversed input both match it.
+and cancellation. Independent PostgreSQL 18.6 oracles supply expected results
+for 5,000 rows across 14 groups in each layout. Forward and reversed input both
+match them. Wide values exercise sums beyond the `bigint` range, and wide keys
+exercise both `bigint` endpoints.
 
 The oracle's [SQL](../crates/syntra-exec/tests/fixtures/grouped_int4.sql) and
 [results](../crates/syntra-exec/tests/fixtures/grouped_int4.txt) are committed.
+The wide [SQL](../crates/syntra-exec/tests/fixtures/grouped_int8.sql) and
+[results](../crates/syntra-exec/tests/fixtures/grouped_int8.txt) are committed too.
 Regenerate the result against a disposable PostgreSQL 18.6 database with
 `psql -XAtq -v ON_ERROR_STOP=1 --pset=null=NULL -f grouped_int4.sql`.
 
 Allowing one extra group deliberately made the early-termination regression fail.
 Restoring the limit check made it pass. These checks establish the stated kernel
-semantics. SQL grouping acceleration, range grouping, multiple columns and spill
+semantics. Deliberately narrowing wide values to `int4` also failed the wide oracle
+check. SQL grouping acceleration, range grouping, multiple columns and spill
 to disk remain future work.
