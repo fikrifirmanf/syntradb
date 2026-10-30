@@ -32,3 +32,30 @@ runs on the same runner type and workload. Check `environment.txt` and `load.log
 for differences. Results from this runner do not establish a speedup over the
 earlier macOS runs. A comparison of 0.6.0 and 0.7.0 needs both versions measured
 under the same conditions.
+
+## Recovery and lifecycle verification
+
+Start **Actions → Recovery and lifecycle verification → Run workflow** to run
+21 independent checks on Ubuntu 24.04 x86_64. Four jobs run at a time. A failed
+job does not cancel the other checks.
+
+- Process crash and logical restore checks.
+- Background maintenance, busy locks and broken-source isolation.
+- Physical backup and point-in-time restore with four writers across two feeds,
+  for each of `int2`, `int4`, `int8` and `numeric`.
+- Standby reads and promotion for those four layouts.
+- Synchronous cascading replication, rewind and quorum failover for `int4`
+  and `numeric`.
+- Upgrades from each archived release, 0.1.0 through 0.6.0, to the current release.
+- Downgrade from 0.7.0 to 0.6.0 and update back to 0.7.0.
+
+Each job builds from source. Its artifact retains the environment, setup and
+check logs, plus server logs and catalog comparisons smaller than 10 MiB each.
+Artifacts expire after seven days. Database directories are not uploaded.
+The checks use disposable local clusters, private Unix sockets and existing
+correctness assertions. They do not connect to a deployed database.
+
+Passing this workflow provides evidence for the tested source commit and workloads.
+It does not cover power loss, faulty storage, real network partitions or sustained
+production traffic. Keep the [readiness gates](../docs/readiness.md) open until
+their remaining requirements have evidence.

@@ -1,0 +1,101 @@
+name: Recovery and lifecycle verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readiness-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: ${{ matrix.check }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        check:
+          - recovery
+          - maintenance
+          - restore-int2
+          - restore-int4
+          - restore-int8
+          - restore-numeric
+          - replica-int2
+          - replica-int4
+          - replica-int8
+          - replica-numeric
+          - topology-int4
+          - topology-numeric
+          - quorum-int4
+          - quorum-numeric
+          - upgrade-0.1.0
+          - upgrade-0.2.0
+          - upgrade-0.3.0
+          - upgrade-0.4.0
+          - upgrade-0.5.0
+          - upgrade-0.6.0
+          - downgrade-0.7.0
+    env:
+      CHECK: ${{ matrix.check }}
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Record verification environment
+        run: |
+          mkdir -p benchmarks/results/readiness
+          {
+            git rev-parse HEAD
+            uname -a
+            lscpu
+            free -h
+            df -h
+            rustup show
+            printf 'Runner image: %s %s\n' "$ImageOS" "$ImageVersion"
+            printf 'Check: %s\n' "$CHECK"
+          } 2>&1 | tee benchmarks/results/readiness/environment.txt
+      - name: Install PostgreSQL build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libicu-dev libreadline-dev zlib1g-dev libssl-dev libclang-dev clang bison flex bc
+      - name: Build project-local PostgreSQL and pgrx
+        timeout-minutes: 90
+        run: bash scripts/setup.sh 2>&1 | tee benchmarks/results/readiness/setup.log
+      - name: Verify recovery or lifecycle behavior
+        timeout-minutes: 50
+        run: |
+          case "$CHECK" in
+            recovery) command=(bash scripts/recovery-checks.sh --output benchmarks/results/readiness/recovery.json) ;;
+            maintenance) command=(bash scripts/maintenance-check.sh) ;;
+            restore-*) command=(bash scripts/physical-restore-check.sh "${CHECK#restore-}" 4 2) ;;
+            replica-*) command=(bash scripts/replica-check.sh "${CHECK#replica-}") ;;
+            topology-*) command=(bash scripts/replica-topology-check.sh "${CHECK#topology-}") ;;
+            quorum-*) command=(bash scripts/quorum-check.sh "${CHECK#quorum-}") ;;
+            upgrade-*) command=(bash scripts/upgrade-check.sh "${CHECK#upgrade-}") ;;
+            downgrade-0.7.0) command=(bash scripts/downgrade-0.7.0-check.sh) ;;
+            *) echo "Unknown verification check: $CHECK" >&2; exit 2 ;;
+          esac
+          timeout --signal=TERM --kill-after=60s 45m "${command[@]}" \
+            2>&1 | tee benchmarks/results/readiness/check.log
+      - name: Collect server diagnostics
+        if: always()
+        run: |
+          if [[ -d target ]]; then
+            find target -type f \( -name '*.log' -o -name '*.diff' -o -name '*.catalog' \) \
+              -size -10M -exec cp --parents '{}' benchmarks/results/readiness/ \;
+          fi
+      - name: Save verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: readiness-${{ matrix.check }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmarks/results/readiness/
+          if-no-files-found: warn
+          retention-days: 7
