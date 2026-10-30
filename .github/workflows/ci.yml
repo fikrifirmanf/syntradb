@@ -12,6 +12,9 @@ on:
       - '.github/workflows/fuzz.yml'
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
@@ -20,7 +23,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install PostgreSQL build dependencies
         run: |
           sudo apt-get update
@@ -28,6 +33,16 @@ jobs:
       - name: Install pinned Rust toolchain
         run: rustup show
       - name: Build project-local PostgreSQL and pgrx
-        run: bash scripts/setup.sh
+        run: |
+          mkdir -p benchmarks/results/ci
+          bash scripts/setup.sh 2>&1 | tee benchmarks/results/ci/setup.log
       - name: Check Rust and PostgreSQL integration
-        run: bash scripts/check.sh
+        run: bash scripts/check.sh 2>&1 | tee benchmarks/results/ci/check.log
+      - name: Save build and test logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmarks/results/ci/
+          if-no-files-found: warn
+          retention-days: 7
