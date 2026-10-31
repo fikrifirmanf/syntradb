@@ -14,6 +14,7 @@ mod checkpoint_checks;
 mod checkpoint_soak;
 mod checkpoint_stress;
 mod checks;
+mod grouping_benchmark;
 mod grouping_checks;
 mod mixed;
 mod refresh_costs;
@@ -518,6 +519,11 @@ fn run(options: &Options) -> Result<Value> {
     } else {
         Value::Null
     };
+    let grouping_benchmark = if options.grouping_benchmark {
+        grouping_benchmark::run(&cluster, options)?
+    } else {
+        Value::Null
+    };
     let configure = Command::new(options.pg_bin.join("pg_config"))
         .arg("--configure")
         .output()?;
@@ -538,7 +544,7 @@ fn run(options: &Options) -> Result<Value> {
         "execution_order": "four EXPLAIN routes and five prepared-request routes rotated deterministically each repetition",
         "timing": "server EXPLAIN ANALYZE execution time; client and planning latency excluded",
         "scope": "warm data; isolated analytical cases plus optional paced mixed microbenchmark; no cold-cache, full HTAP synchronization or ClickHouse comparison",
-        "datasets": datasets, "mixed": mixed, "recovery_checks": recovery, "capture_recovery": capture_recovery, "checkpoint_recovery": checkpoint_recovery, "trusted_stress": trusted_stress, "checkpoint_stress": checkpoint_stress, "refresh_costs": refresh_costs, "catalog_probe": catalog_probe }),
+        "datasets": datasets, "grouping_benchmark": grouping_benchmark, "mixed": mixed, "recovery_checks": recovery, "capture_recovery": capture_recovery, "checkpoint_recovery": checkpoint_recovery, "trusted_stress": trusted_stress, "checkpoint_stress": checkpoint_stress, "refresh_costs": refresh_costs, "catalog_probe": catalog_probe }),
     )
 }
 

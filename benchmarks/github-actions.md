@@ -33,6 +33,12 @@ for differences. Results from this runner do not establish a speedup over the
 earlier macOS runs. A comparison of 0.6.0 and 0.7.0 needs both versions measured
 under the same conditions.
 
+## Integer grouping comparison
+
+The separate [integer grouping benchmark](integer-grouping.md) compares the
+explicit SQL grouping API with native GROUP BY, including native parallel plans.
+It retains raw request samples, execution plans and runner details.
+
 ## Recovery and lifecycle verification
 
 Start **Actions → Recovery and lifecycle verification → Run workflow** to run

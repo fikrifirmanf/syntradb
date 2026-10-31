@@ -68,6 +68,7 @@ pub struct Options {
     pub checkpoint_soak_skip: Vec<String>,
     pub refresh_cost_checks: bool,
     pub catalog_probe_checks: bool,
+    pub grouping_benchmark: bool,
 }
 
 impl Options {
@@ -101,6 +102,7 @@ impl Options {
             checkpoint_soak_skip: Vec::new(),
             refresh_cost_checks: false,
             catalog_probe_checks: false,
+            grouping_benchmark: false,
         };
         while let Some(flag) = args.next() {
             let value = args.next().ok_or("each option requires a value")?;
@@ -157,6 +159,7 @@ impl Options {
                 }
                 "--refresh-cost-checks" => options.refresh_cost_checks = value.parse()?,
                 "--catalog-probe-checks" => options.catalog_probe_checks = value.parse()?,
+                "--grouping-benchmark" => options.grouping_benchmark = value.parse()?,
                 _ => return Err("unknown benchmark option".into()),
             }
         }
