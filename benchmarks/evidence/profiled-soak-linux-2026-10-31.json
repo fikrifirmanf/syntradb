@@ -630,7 +630,9 @@
         "self.txt": "0dc7828d65e7b42856e7539b6047945e22d8d8351a61f5db7c6fb5a87d8eeb3f",
         "callchains.txt": "16c95558a9b00249678eac77f44f8a46058660d4f11a434d3ba24829783090e7",
         "activity.json": "4e4d7003abf58265828d808b433556b5716580558685b74fb36b1c0062a9ecc7"
-      }
+      },
+      "report_percent_limit": 0.1,
+      "unnamed_self_samples_scope": "Visible self rows at the report threshold; lower bound when smaller rows are hidden."
     },
     {
       "minute": 28,
@@ -1269,7 +1271,9 @@
         "self.txt": "6741af86dc4be3140a735e1dc86b56f817fe1d5c99507049dc711fc76ea44121",
         "callchains.txt": "07da3b0d3bcaaf273e816e665efcff753d829b59a7b48fc4b0d866a0c5719a46",
         "activity.json": "2699008224200afeea25c66a6c3bc9df8fc5905acb08d7b7d46f3ebfc83f3d92"
-      }
+      },
+      "report_percent_limit": 0.1,
+      "unnamed_self_samples_scope": "Visible self rows at the report threshold; lower bound when smaller rows are hidden."
     },
     {
       "minute": 58,
@@ -1987,7 +1991,9 @@
         "self.txt": "a428b4f189b38e3e480ee13b6cc46b040ae128cc485850ece404f3ab2bf6d070",
         "callchains.txt": "3d83a2f5871c694d4ea245e4473b7716c16e555479a02fb5ad31ba7fca941a87",
         "activity.json": "54c699026c24ef8bfef14c3c6963495c9edb02d8acac7c04cfe766c39f0bd566"
-      }
+      },
+      "report_percent_limit": 0.1,
+      "unnamed_self_samples_scope": "Visible self rows at the report threshold; lower bound when smaller rows are hidden."
     },
     {
       "minute": 65,
@@ -2696,7 +2702,9 @@
         "self.txt": "a65d20b61e7c707f6432c3214bdb0bd0e9ccc02312c38070aef7c5348b8d48df",
         "callchains.txt": "d3d0b34b2fe8fb128d9e147fa28a474b6d31e79964dcf439995f7310029a5513",
         "activity.json": "1da891a076c52d67488224a75ef35c42aa5871b65265d1696e9e258fbe774fa1"
-      }
+      },
+      "report_percent_limit": 0.1,
+      "unnamed_self_samples_scope": "Visible self rows at the report threshold; lower bound when smaller rows are hidden."
     }
   ],
   "workers": [
@@ -17320,5 +17328,126 @@
     "CPU percentages are global across all workers. Inclusive percentages overlap and must not be added.",
     "C-to-Rust guard boundaries truncate some call chains. No exact extension-inclusive CPU split is claimed.",
     "Native source-index insertion and oracle scans are visible costs, not proof that capture has zero overhead."
-  ]
+  ],
+  "job_record": {
+    "conclusion": "failure",
+    "headSha": "05d4c14403aefd0233502216cb02beabb1a118e4",
+    "jobs": [
+      {
+        "completedAt": "2026-10-31T16:31:22Z",
+        "conclusion": "failure",
+        "databaseId": 124561281610,
+        "name": "soak",
+        "startedAt": "2026-10-31T14:18:07Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T14:18:09Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T14:18:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:18:10Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-10-31T14:18:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:18:21Z",
+            "conclusion": "success",
+            "name": "Record source and runner",
+            "number": 3,
+            "startedAt": "2026-10-31T14:18:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:18:35Z",
+            "conclusion": "success",
+            "name": "Install PostgreSQL build dependencies",
+            "number": 4,
+            "startedAt": "2026-10-31T14:18:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:18:41Z",
+            "conclusion": "success",
+            "name": "Install Linux profiler",
+            "number": 5,
+            "startedAt": "2026-10-31T14:18:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:18:45Z",
+            "conclusion": "success",
+            "name": "Check profiling capability before building PostgreSQL",
+            "number": 6,
+            "startedAt": "2026-10-31T14:18:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:25:56Z",
+            "conclusion": "success",
+            "name": "Build project-local PostgreSQL and pgrx",
+            "number": 7,
+            "startedAt": "2026-10-31T14:18:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T16:31:13Z",
+            "conclusion": "failure",
+            "name": "Run production checkpoint soak",
+            "number": 8,
+            "startedAt": "2026-10-31T14:25:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T16:31:15Z",
+            "conclusion": "success",
+            "name": "Render available CPU profiles after the timed workload",
+            "number": 9,
+            "startedAt": "2026-10-31T16:31:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T16:31:15Z",
+            "conclusion": "skipped",
+            "name": "Verify completed soak report",
+            "number": 10,
+            "startedAt": "2026-10-31T16:31:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T16:31:20Z",
+            "conclusion": "success",
+            "name": "Save benchmark logs and report",
+            "number": 11,
+            "startedAt": "2026-10-31T16:31:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T16:31:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 22,
+            "startedAt": "2026-10-31T16:31:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T16:31:20Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 23,
+            "startedAt": "2026-10-31T16:31:20Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/fikrifirmanf/syntradb/actions/runs/41209482855/job/124561281610"
+      }
+    ]
+  }
 }

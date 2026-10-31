@@ -14,7 +14,7 @@ the verdict, all 120 windows, worker counters and profile summaries.
 | Repeatable read | 60,017 / 216,000 | 27.79% | 166.271 ms |
 
 The missed-arrival ceiling remains 5%; the p99 ceiling remains 1,000 ms.
-Resource gates passed: 7,577 WAL bytes per committed write, about 708 MiB peak
+Resource gates passed: 7,577 WAL bytes per committed writer cycle, about 708 MiB peak
 database plus WAL, and final catalog bytes below the release-period ceiling.
 The oldest snapshot reached age 187,554 before release and cleared afterward.
 
