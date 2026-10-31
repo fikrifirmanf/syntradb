@@ -2,7 +2,13 @@
 
 The `Checkpoint soak benchmark` workflow runs the production `int4` workload
 with recovery checks. It defaults to 7,200 seconds: one hour with a held snapshot,
-then one hour after release. Choose 1,200 seconds for a smoke run.
+then one hour after release. Choose 1,200 seconds for a shorter soak, or 240 for
+an integration smoke. Neither replaces the long-run throughput evidence.
+
+Enable the optional [CPU and wait-event profiler](profiled-checkpoint-soak.md)
+for diagnostics. It verifies sampling capability before the PostgreSQL build,
+captures selected retained/released windows, and preserves raw profiles.
+Profiled runs retain every existing gate but include measurement overhead.
 
 1. Push this checkout to your GitHub repository, including the workflow on its default branch.
 2. Open **Actions → Checkpoint soak benchmark → Run workflow**.
