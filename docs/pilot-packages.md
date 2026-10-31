@@ -71,4 +71,14 @@ prefix. Both failed test clusters stopped. This checks that verification loads
 the packaged assets and propagates failures.
 
 The explicit Python suite passed 18 tests, including six packaging tests.
-Linux installation CI is pending; local success does not establish Linux support.
+The [Linux CI run](https://github.com/fikrifirmanf/syntradb/actions/runs/41231225170)
+also passed at `fdaa7a2`: 218 PostgreSQL tests, 18 Python tests, the Rust checks
+and both package installation checks. The Ubuntu 24.04 x86_64 archive checksum is
+`d033070a16106e1134e7067a7dc352405fa8e3c2c8647a769a5653344239236f`.
+The [Linux evidence](../benchmarks/evidence/pilot-package-linux-2026-11-01.json)
+records the CI package summary, checksum and terminal job result. Downloading
+the Linux binary artifact stalled locally, and a bounded retry timed out.
+Its producer-side archive installation checks passed. The full manifest and
+SQL logs remain in the seven-day artifact; a separate local checksum check is
+pending. These results cover the two tested build environments, not a general
+deployment support matrix.

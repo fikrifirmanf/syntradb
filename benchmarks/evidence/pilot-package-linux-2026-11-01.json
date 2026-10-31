@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "run_url": "https://github.com/fikrifirmanf/syntradb/actions/runs/41231225170",
+  "source_commit": "fdaa7a2e249345fc44bb74433c777f5c65529c21",
+  "platform": "Ubuntu 24.04 x86_64",
+  "job_record": {
+    "conclusion": "success",
+    "headSha": "fdaa7a2e249345fc44bb74433c777f5c65529c21",
+    "jobs": [
+      {
+        "completedAt": "2026-10-31T18:59:35Z",
+        "conclusion": "success",
+        "databaseId": 124625747190,
+        "name": "check",
+        "startedAt": "2026-10-31T18:49:14Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T18:49:15Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T18:49:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:49:17Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-10-31T18:49:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:49:27Z",
+            "conclusion": "success",
+            "name": "Install PostgreSQL build dependencies",
+            "number": 3,
+            "startedAt": "2026-10-31T18:49:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:49:36Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain",
+            "number": 4,
+            "startedAt": "2026-10-31T18:49:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:54:09Z",
+            "conclusion": "success",
+            "name": "Build project-local PostgreSQL and pgrx",
+            "number": 5,
+            "startedAt": "2026-10-31T18:49:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:56:42Z",
+            "conclusion": "success",
+            "name": "Check Rust and PostgreSQL integration",
+            "number": 6,
+            "startedAt": "2026-10-31T18:54:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:59:30Z",
+            "conclusion": "success",
+            "name": "Build and verify a pilot installation bundle",
+            "number": 7,
+            "startedAt": "2026-10-31T18:56:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:59:32Z",
+            "conclusion": "success",
+            "name": "Save pilot bundle and installation evidence",
+            "number": 8,
+            "startedAt": "2026-10-31T18:59:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:59:33Z",
+            "conclusion": "success",
+            "name": "Save build and test logs",
+            "number": 9,
+            "startedAt": "2026-10-31T18:59:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:59:34Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 18,
+            "startedAt": "2026-10-31T18:59:33Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T18:59:34Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-31T18:59:34Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/fikrifirmanf/syntradb/actions/runs/41231225170/job/124625747190"
+      }
+    ]
+  },
+  "package_summary_from_ci_log": {
+    "archive": "/home/runner/work/syntradb/syntradb/benchmarks/results/pilot-package/syntradb-0.9.0-pg18-x86_64-unknown-linux-gnu-pilot.tar.gz",
+    "sha256": "d033070a16106e1134e7067a7dc352405fa8e3c2c8647a769a5653344239236f",
+    "verification": {
+      "status": "passed",
+      "checks": {
+        "version": "0.9.0",
+        "profile": "release",
+        "fingerprint": "1c4518ec479c2179c6dfea89bc60a2a9fbb8a76e1567519c83615be7b89d699f",
+        "rows": 2,
+        "sum": 31,
+        "route": "checkpoint",
+        "pending": 0
+      },
+      "fresh_heap_ssi": "2|31",
+      "private_install": true
+    }
+  },
+  "ci_tests": {
+    "postgresql": 218,
+    "python": 18,
+    "rust_checks": "passed"
+  },
+  "log_sha256": {
+    "check.log": "3471c813ef0387dbe592e5491bd9e9f4cef3a37cfa6afdd97f3bf876bf5d827d",
+    "package.log": "5c99462ef196539cd9dd759bba8796c33ed3b2b6603150492943b3dddcf6397c",
+    "production-setup.log": "3c076aab72bf4178488f262bc756bde5f58f24a69307e734a6500f508d8a7a5a"
+  },
+  "artifact_name": "pilot-package-41231225170-1",
+  "archive_download_verification": "Pending locally: gh transfer stalled, then a bounded retry timed out. Producer-side staged and extracted-archive installation checks passed in CI.",
+  "limitations": [
+    "Pilot installation check, not a production release or complete recovery/deployment qualification.",
+    "Checksum was recorded by the producer; independent local Linux archive checksum verification has not completed.",
+    "Manifest and raw SQL logs remain in the seven-day Actions artifact."
+  ]
+}
