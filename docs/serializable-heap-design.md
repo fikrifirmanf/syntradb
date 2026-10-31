@@ -63,6 +63,6 @@ checks must pass. Temporarily bypassing the native scan in a conflict case must
 make the SSI regression fail before restoring the correct implementation.
 
 The [0.9.0 implementation](serializable-heap-reads.md) follows this split and has
-local conflict and recovery evidence. Native Linux verification remains pending.
+local and native Linux conflict and recovery evidence.
 The source inspection alone is not the support evidence, and cached-state SSI
 remains unimplemented.

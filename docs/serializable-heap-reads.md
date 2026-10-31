@@ -73,5 +73,5 @@ conflict regression failed. The correct source read and assertion were restored.
 Inverting the expected read-time SQLSTATE also failed its regression.
 
 The [design](serializable-heap-design.md) records the native scan contract.
-Local checks pass; native Linux verification for 0.9.0 is pending. The earlier
-held-snapshot throughput limit remains open.
+The [local and native Linux checks](verification-0.9.0.md) pass for 0.9.0.
+The earlier held-snapshot throughput limit remains open.

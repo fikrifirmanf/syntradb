@@ -1,9 +1,24 @@
 # Serializable heap verification for 0.9.0
 
-Local PostgreSQL 18.6 checks pass for the
-[fresh heap SSI contract](serializable-heap-reads.md). Native Linux CI and the
-27-case recovery and lifecycle suite remain required before merging 0.9.0.
+Local and native Linux PostgreSQL 18.6 checks pass for the
+[fresh heap SSI contract](serializable-heap-reads.md). The Linux CI, dependency
+checks and all 27 recovery and lifecycle cases passed at commit `b92ae0d`.
 This feature does not resolve the earlier held-snapshot throughput failure.
+
+## Native Linux evidence
+
+The [CI run](https://github.com/fikrifirmanf/syntradb/actions/runs/41185470457)
+passed 218 PostgreSQL tests, six Python tests and the Rust checks.
+The [27-case lifecycle run](https://github.com/fikrifirmanf/syntradb/actions/runs/41185475801)
+passed every case and its planning job. Its recovery log confirms all fresh-read
+modes, conflicting transaction pairs, read-time aborts and cached/capture guards.
+The [versioned job record](../benchmarks/evidence/recovery-linux-090-2026-10-31.json)
+preserves job steps and conclusions.
+
+The [dependency run](https://github.com/fikrifirmanf/syntradb/actions/runs/41185470434)
+found zero known vulnerabilities in both lockfiles. The workspace's unmaintained
+`serde_cbor` warning remains visible and documented. These results establish the
+tested behavior; they do not close the broader production gates.
 
 ## Fresh reads and transaction conflicts
 
