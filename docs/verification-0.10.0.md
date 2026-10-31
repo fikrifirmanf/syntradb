@@ -33,6 +33,13 @@ The old loaded library reported its original source fingerprint during the
 round trip. The [baseline provenance](../build-support/upgrade-baselines/syntradb-0.9.0-src.json)
 lists every retained file and exclusion.
 
+The final production runner and loaded library share source fingerprint
+`5ee658522cd78b6972d5839d6ba0019d230e8240bbbc3b0ad42dcc803570a9bb`.
+The macOS arm64 pilot archive passed both staged and extracted installation
+checks, including a timestamp-filtered sum. The
+[local evidence](../benchmarks/evidence/temporal-local-2026-11-01.json) records
+the checks, log hashes, package manifest and archive checksum at `205013b`.
+
 Native Linux CI, pilot archive installation and the expanded 30-case lifecycle
 suite remain pending. No performance claim or throughput-gate closure follows
 from these functional checks. The earlier held-snapshot load failure remains open.

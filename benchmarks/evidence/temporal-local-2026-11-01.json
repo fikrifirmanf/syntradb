@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "source_commit": "205013b",
+  "version": "0.10.0",
+  "source_fingerprint": "5ee658522cd78b6972d5839d6ba0019d230e8240bbbc3b0ad42dcc803570a9bb",
+  "extension_source_fingerprint": "5ee658522cd78b6972d5839d6ba0019d230e8240bbbc3b0ad42dcc803570a9bb",
+  "report_sha256": "c6c59107923223be6146b89d19f135ea949652331a8ed239149f3f2d53e0ab49",
+  "ssi_checks": [
+    "serializable read-write, read-only and deferrable fresh reads without assigned XIDs",
+    "source relation predicate locks, including empty and unmatched range reads",
+    "write skew aborts one transaction with 40001 for custom and mixed native/custom reads",
+    "empty-table and range-insertion phantoms abort one transaction with 40001",
+    "read-time 40001 unwinds each native heap scan and permits reuse after rollback",
+    "date, timestamp and timestamptz filters retain RR snapshots across concurrent predicate/value changes",
+    "matching and fully filtered temporal scans honor cancellation and allow subsequent backend reuse",
+    "native invariants checked after participant transactions, without masking custom dependencies",
+    "capture, live reuse and checkpoint reuse remain explicitly unsupported under SSI"
+  ],
+  "test_counts": {
+    "postgresql": 230,
+    "new_temporal_postgresql": 12,
+    "python": 18
+  },
+  "version_lifecycle": {
+    "upgrade_from_0_9": "passed; all 538 catalog entries matched",
+    "live_upgrade": "30 seconds; 1892 writes committed, zero failed, heap/events/drained checkpoint agreed",
+    "downgrade_round_trip": "0.10 -> 0.9 -> 0.10 passed with both libraries; dependent views blocked removal atomically; catalog parity"
+  },
+  "negative_controls": {
+    "timestamp_upper_comparator": "Changing timestamp_lt to timestamp_le failed the boundary regression, then restored.",
+    "strategy_metadata_only": "Changing scan-key strategy metadata alone did not alter heap comparator behavior; the actual function mutation above is the semantic control."
+  },
+  "logs_sha256": {
+    "temporal-final-check.log": "40bbae30ec308b713481ed254261bfc2d237ec3bff65d5672343735cfcb19486",
+    "temporal-contract-final.log": "e54a99e114f32396ae43909fc9f5775404339bce9ed94b1ec8cfe30b1fdfbea0",
+    "temporal-upgrade-final.log": "05bda5689dedff02261fc485a20bf84042facedab36b3d6ac9c798744e5a36f4",
+    "temporal-upgrade-load.log": "40b209d5d5ca1c4916f7eb6f4b0a1fcfcc2c84af9f1a71bc0aa2a06f45bc1121",
+    "temporal-downgrade.log": "f2c6e77e735fd60bc398bde6d23062fa2f1f0c80c2a49a81257c6224b2a5d7cf",
+    "temporal-negative-inclusive-operator.log": "9e39e82831e98e0bdb878333353b9ff855df3ad09be05bf944fe29024f351677"
+  },
+  "audit_notes": [
+    "Backend audit passed; 35 warnings were existing unwrap assertions inside the cfg(test)/pg_test module, not production handlers.",
+    "Generic missing-test mapper does not recognize included pgrx temporal_tests.rs; actual 12 PostgreSQL cases executed."
+  ],
+  "limitations": [
+    "Native Linux CI, pilot bundle and 30 lifecycle checks pending.",
+    "Fresh explicit heap scans only; no timestamp checkpoint encoding or planner routing.",
+    "No performance claim; prior held-snapshot load gate remains open."
+  ],
+  "pilot_archive": {
+    "sha256sums": "16f67d18e2c7678d064e55fe64914611b98bb843b827ab48beb859afd6a00dd3  syntradb-0.10.0-pg18-aarch64-apple-darwin-pilot.tar.gz\n",
+    "verification": {
+      "status": "passed",
+      "checks": {
+        "version": "0.10.0",
+        "profile": "release",
+        "fingerprint": "5ee658522cd78b6972d5839d6ba0019d230e8240bbbc3b0ad42dcc803570a9bb",
+        "rows": 2,
+        "sum": 31,
+        "route": "checkpoint",
+        "pending": 0,
+        "time_sum": 31
+      },
+      "fresh_heap_ssi": "2|31",
+      "private_install": true
+    },
+    "manifest": {
+      "schema_version": 1,
+      "status": "pilot; not a production release",
+      "commit": "205013b19e34c5570ff35475857e7ced71232867",
+      "version": "0.10.0",
+      "source_fingerprint": "5ee658522cd78b6972d5839d6ba0019d230e8240bbbc3b0ad42dcc803570a9bb",
+      "postgresql": "PostgreSQL 18.6",
+      "postgresql_configure": "'--prefix=/Users/fikrifirmanf/Development/syntradb/.tools/postgresql-production/18.6/install' '--with-pgport=28918' '--disable-cassert' '--disable-debug' 'CFLAGS=-O2' 'PKG_CONFIG_PATH=/opt/homebrew/opt/icu4c@79/lib/pkgconfig'",
+      "platform": "macOS-27.0.1-arm64-arm-64bit",
+      "libc": [
+        "",
+        ""
+      ],
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1",
+      "files": {
+        "LICENSE": {
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "bytes": 35149
+        },
+        "extension/syntradb--0.1.0--0.2.0.sql": {
+          "sha256": "355ae79b2b13849f0191b5af633acce1dfc30e7d541e5935d1ff1ecb84d94192",
+          "bytes": 5079
+        },
+        "extension/syntradb--0.10.0--0.9.0.sql": {
+          "sha256": "1acb83f2bfe0b4a49213ba50721fdb30ad75f4dec4934e87719bf8a89837f459",
+          "bytes": 428
+        },
+        "extension/syntradb--0.10.0.sql": {
+          "sha256": "5071c56fd8218b11aea50eee4697a0a396a951cb43d50d806cf574831ce52f12",
+          "bytes": 38264
+        },
+        "extension/syntradb--0.2.0--0.3.0.sql": {
+          "sha256": "136d236dd8a1bc63b66f875d86db4f5f3c2f68410fc8831e929ed17a241638c5",
+          "bytes": 1742
+        },
+        "extension/syntradb--0.3.0--0.4.0.sql": {
+          "sha256": "2dfe45a1601afee900da14a7479bdba2e5fe879331ba24ff6aebe7db504aea78",
+          "bytes": 1753
+        },
+        "extension/syntradb--0.4.0--0.3.0.sql": {
+          "sha256": "2d39d8c2e23fdf14dfe94410d80302370ec9578a03346364a42b2cead9de7848",
+          "bytes": 1992
+        },
+        "extension/syntradb--0.4.0--0.5.0.sql": {
+          "sha256": "9df3f4619ede87b5c1eec4db0c72def9944d7d8e0773433e5c239e688a4ec3f5",
+          "bytes": 892
+        },
+        "extension/syntradb--0.5.0--0.4.0.sql": {
+          "sha256": "795ce9602e86ad5bd1f879bef47d610bc71da5ab5c1c82d66dfa184fe0a35ce0",
+          "bytes": 1264
+        },
+        "extension/syntradb--0.5.0--0.6.0.sql": {
+          "sha256": "f18762cf11066fb4d6f6439545809f3746373d6a2340691e83ebc70c762b0ef4",
+          "bytes": 2345
+        },
+        "extension/syntradb--0.6.0--0.5.0.sql": {
+          "sha256": "1506e0d10af858f8d348ed65112fcdcd6b9cb4dd561b6e3feb033d37ad5d6656",
+          "bytes": 2070
+        },
+        "extension/syntradb--0.6.0--0.7.0.sql": {
+          "sha256": "8386c552c94e24fa1b0028dabea53e03bcf17db23db70d49887203d449db388a",
+          "bytes": 1245
+        },
+        "extension/syntradb--0.7.0--0.6.0.sql": {
+          "sha256": "9171a7dd80f29989db6bc136ea2311b763a2fbf5dbe98b99b53b5d65dceaf762",
+          "bytes": 1278
+        },
+        "extension/syntradb--0.7.0--0.8.0.sql": {
+          "sha256": "6d0f318e4d3df7f68fbe28cd79b0a73b54b8ab7e169019af7696e849bf9dfc30",
+          "bytes": 512
+        },
+        "extension/syntradb--0.8.0--0.7.0.sql": {
+          "sha256": "6981d51f2fda7521cd74401d90cac3d73274257a1ec1dd34487b281e80306167",
+          "bytes": 239
+        },
+        "extension/syntradb--0.8.0--0.9.0.sql": {
+          "sha256": "ff8a0ffc1775fc46391a8fd85d3015615429b3d8527d7a0610bb88746940d63d",
+          "bytes": 302
+        },
+        "extension/syntradb--0.9.0--0.10.0.sql": {
+          "sha256": "db50dbe830b98de7b8f8292557709047981fa3d11d625e6452d390f9a96fbddf",
+          "bytes": 1101
+        },
+        "extension/syntradb--0.9.0--0.8.0.sql": {
+          "sha256": "6db9dd1ae9e9fb2345eaf5a8cc1d7bc4dca4ef99894accb48c9317ae15ef01e8",
+          "bytes": 317
+        },
+        "extension/syntradb.control": {
+          "sha256": "8f9fb1ee72627f07497a651c24a5cae4074943bd40d58ca23bffa4459224d3c6",
+          "bytes": 190
+        },
+        "lib/syntradb.dylib": {
+          "sha256": "4218f1658222db159402583ee27d32de095f294f1e4be463e81afd8cada3c4eb",
+          "bytes": 2478304
+        },
+        "source.tar.gz": {
+          "sha256": "256007e692c539f89462ad8417dc9a6e81a6f811cbe923a9ec7811a800d7c789",
+          "bytes": 7177734
+        },
+        "verification.json": {
+          "sha256": "d40d1bb6648dc44ee2c267ab29c67feaf95219eeaecda2491e956082b22698ca",
+          "bytes": 331
+        }
+      },
+      "source_date_epoch": 1793482675,
+      "build_environment": {}
+    }
+  }
+}
