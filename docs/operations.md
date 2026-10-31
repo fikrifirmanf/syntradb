@@ -9,8 +9,8 @@ hardware before relying on it.
 
 - Run `bash scripts/check.sh` on the build you install. It has passed on macOS
   arm64 and Ubuntu 24.04 arm64 and x86_64. A native GitHub-hosted x86_64 run
-  passed 194 PostgreSQL tests at commit `7b3609f`; see the
-  [verification record](verification-2026-10-31.md).
+  passed 218 PostgreSQL tests at commit `b92ae0d`; see the
+  [0.9.0 verification record](verification-0.9.0.md).
 - Capture accepts permanent heap tables with one int2, int4 or int8 primary key
   and one int2, int4, int8 or `numeric(p,s)` value column, with p ≤ 18. See
   [transactional capture](transactional-capture.md) for the full list of
@@ -87,12 +87,23 @@ explicit. SyntraDB never drops events on its own to admit a write.
 
 ## Upgrades
 
-Install the new library, then run `ALTER EXTENSION syntradb UPDATE` in every
-database that has the extension. Local checks cover upgrades from 0.1.0 through
-0.6.0 to 0.7.0. Downgrade checks cover 0.7.0 to 0.6.0 and earlier supported
-paths. A downgrade from 0.4.0 to 0.3.0 refuses while a `numeric` feed exists.
-See [upgrades](upgrades.md) and the current
-[verification record](verification-2026-10-31.md).
+Read the [version-specific upgrade procedure](upgrades.md) before installing
+the new library. End sessions that loaded the old library; if SyntraDB is in
+`shared_preload_libraries`, restart PostgreSQL. Then run
+`ALTER EXTENSION syntradb UPDATE` in every database that has the extension.
+Plan a window when captured writers can pause or retry, and keep maintenance
+running where the version-specific procedure permits it.
+
+The [0.9.0 verification record](verification-0.9.0.md) links the passing native
+Linux lifecycle suite, including upgrades from 0.1.0 through 0.8.0 and supported
+downgrade round trips. Follow each downgrade's own ordering and guards. A
+downgrade from 0.4.0 to 0.3.0 refuses while a `numeric` feed exists.
+
+For 0.8.0 to 0.9.0, the SQL update changes only the version marker. Fresh heap
+reads gain serializable support when the new library is loaded, even before
+the SQL update. Capture and cached-state calls still reject serializable
+transactions. Retry the whole transaction after a serialization failure;
+see [the SSI contract](serializable-heap-reads.md).
 
 ## Not covered
 
