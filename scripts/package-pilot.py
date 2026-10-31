@@ -17,6 +17,13 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def library_name(system):
+    names = {'Darwin': 'syntradb.dylib', 'Linux': 'syntradb.so'}
+    if system not in names:
+        raise ValueError('pilot packaging currently supports Linux and macOS')
+    return names[system]
+
+
 def run(argv, *, timeout=120, **kwargs):
     return subprocess.run([str(x) for x in argv], check=kwargs.pop('check', True), timeout=timeout, **kwargs)
 
@@ -174,9 +181,10 @@ def build(pg_config, destination):
     with (destination / 'build.log').open('w') as log:
         run(['bash', ROOT / 'scripts/pgrx.sh', 'package', '--cargo=--locked', '--pg-config', pg_config,
              '--out-dir', stage], timeout=1800, env=env, stdout=log, stderr=subprocess.STDOUT)
-    library = stage / config(pg_config, '--pkglibdir').relative_to('/') / 'syntradb.so'
+    name = library_name(platform.system())
+    library = stage / config(pg_config, '--pkglibdir').relative_to('/') / name
     extension = stage / config(pg_config, '--sharedir').relative_to('/') / 'extension'
-    shutil.copy2(library, bundle / 'lib/syntradb.so')
+    shutil.copy2(library, bundle / 'lib' / name)
     sql_files = sorted(extension.glob('syntradb*'))
     required = {'syntradb.control', f'syntradb--{version}.sql'} | {p.name for p in (ROOT / 'crates/syntra-pg/sql').glob('syntradb*.sql')}
     if {p.name for p in sql_files} != required:

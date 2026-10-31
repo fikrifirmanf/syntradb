@@ -13,6 +13,12 @@ SPEC.loader.exec_module(package)
 
 
 class PackagePilotTests(unittest.TestCase):
+    def test_library_suffix_matches_postgresql_18_on_each_platform(self):
+        self.assertEqual(package.library_name('Linux'), 'syntradb.so')
+        self.assertEqual(package.library_name('Darwin'), 'syntradb.dylib')
+        with self.assertRaisesRegex(ValueError, 'Linux and macOS'):
+            package.library_name('Windows')
+
     def setUp(self):
         scratch = tempfile.TemporaryDirectory(prefix='syntra-bundle-test-')
         self.addCleanup(scratch.cleanup)

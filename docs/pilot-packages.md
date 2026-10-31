@@ -20,7 +20,7 @@ target is PostgreSQL 18.6 built with the repository's production flags. The
 bundle is specific to the build host's target and dependencies. Linux CI checks
 Ubuntu 24.04 x86_64; local macOS builds need their own installation evidence.
 
-The bundle contains `lib/syntradb.so`, the generated extension install SQL,
+The bundle contains `lib/syntradb.so` (`.dylib` on macOS), the generated install SQL,
 every version transition script, the control file, license, repository source
 archive, build manifest and verification result. The source archive records the
 exact Git commit. Dependencies remain pinned in Cargo.lock; this is not an
@@ -45,8 +45,8 @@ Every check must pass before the final archive and SHA256SUMS file are written.
 The cluster stops on both success and failure. Build and SQL logs remain beside
 the bundle. A failed build never produces a verified final archive.
 
-Four offline tests cover payload tampering, missing and extra files, symlink
-rejection, stable archives and the source-fingerprint wire format. Disabling the
+Five offline tests cover platform library names, payload tampering, missing and
+extra files, symlink rejection, stable archives and the source-fingerprint format. Disabling the
 manifest comparison made the tampering test fail; the comparison was restored.
 Native installation checks provide separate evidence beyond these offline tests.
 
