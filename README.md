@@ -66,7 +66,9 @@ cargo clippy --locked --all-targets -- -D warnings
 
 The development baseline is PostgreSQL 18.6 and pgrx/cargo-pgrx 0.19.3. This is the
 currently tested baseline, not a commitment to support every PostgreSQL release.
-The project license remains undecided; Cargo packages are not published.
+SyntraDB is licensed under [GNU GPL version 3 only](LICENSE) (`GPL-3.0-only`).
+Cargo packages are not published. Contributors must follow the
+[code of conduct](CODE_OF_CONDUCT.md).
 
 Install Python 3, a C/C++ compiler, make, pkg-config, ICU development headers, libclang,
 curl, tar and shasum. PostgreSQL builds may also require bison, flex and readline
