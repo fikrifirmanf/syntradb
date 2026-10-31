@@ -1,0 +1,386 @@
+{
+  "schema_version": 1,
+  "purpose": "Profiler integration smoke only; not a long-soak throughput result",
+  "source_commit": "b8089421f06edb0762344faf0cf213302b738405",
+  "smoke_url": "https://github.com/fikrifirmanf/syntradb/actions/runs/41208524399",
+  "ci_url": "https://github.com/fikrifirmanf/syntradb/actions/runs/41208519872",
+  "smoke_jobs": {
+    "conclusion": "success",
+    "headSha": "b8089421f06edb0762344faf0cf213302b738405",
+    "jobs": [
+      {
+        "completedAt": "2026-10-31T14:17:00Z",
+        "conclusion": "success",
+        "databaseId": 124558464813,
+        "name": "soak",
+        "startedAt": "2026-10-31T14:05:43Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T14:05:44Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T14:05:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:05:45Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-10-31T14:05:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:05:53Z",
+            "conclusion": "success",
+            "name": "Record source and runner",
+            "number": 3,
+            "startedAt": "2026-10-31T14:05:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:06:02Z",
+            "conclusion": "success",
+            "name": "Install PostgreSQL build dependencies",
+            "number": 4,
+            "startedAt": "2026-10-31T14:05:53Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:06:07Z",
+            "conclusion": "success",
+            "name": "Install Linux profiler",
+            "number": 5,
+            "startedAt": "2026-10-31T14:06:02Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:06:11Z",
+            "conclusion": "success",
+            "name": "Check profiling capability before building PostgreSQL",
+            "number": 6,
+            "startedAt": "2026-10-31T14:06:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:10:05Z",
+            "conclusion": "success",
+            "name": "Build project-local PostgreSQL and pgrx",
+            "number": 7,
+            "startedAt": "2026-10-31T14:06:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:16:55Z",
+            "conclusion": "success",
+            "name": "Run production checkpoint soak",
+            "number": 8,
+            "startedAt": "2026-10-31T14:10:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:16:56Z",
+            "conclusion": "success",
+            "name": "Render available CPU profiles after the timed workload",
+            "number": 9,
+            "startedAt": "2026-10-31T14:16:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:16:56Z",
+            "conclusion": "success",
+            "name": "Verify completed soak report",
+            "number": 10,
+            "startedAt": "2026-10-31T14:16:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:16:58Z",
+            "conclusion": "success",
+            "name": "Save benchmark logs and report",
+            "number": 11,
+            "startedAt": "2026-10-31T14:16:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:16:58Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 22,
+            "startedAt": "2026-10-31T14:16:58Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:16:58Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 23,
+            "startedAt": "2026-10-31T14:16:58Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/fikrifirmanf/syntradb/actions/runs/41208524399/job/124558464813"
+      }
+    ]
+  },
+  "ci_jobs": {
+    "conclusion": "success",
+    "headSha": "b8089421f06edb0762344faf0cf213302b738405",
+    "jobs": [
+      {
+        "completedAt": "2026-10-31T14:12:25Z",
+        "conclusion": "success",
+        "databaseId": 124558511216,
+        "name": "check",
+        "startedAt": "2026-10-31T14:05:55Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T14:05:56Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T14:05:55Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:05:57Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-10-31T14:05:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:06:07Z",
+            "conclusion": "success",
+            "name": "Install PostgreSQL build dependencies",
+            "number": 3,
+            "startedAt": "2026-10-31T14:05:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:06:14Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain",
+            "number": 4,
+            "startedAt": "2026-10-31T14:06:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:10:08Z",
+            "conclusion": "success",
+            "name": "Build project-local PostgreSQL and pgrx",
+            "number": 5,
+            "startedAt": "2026-10-31T14:06:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:12:22Z",
+            "conclusion": "success",
+            "name": "Check Rust and PostgreSQL integration",
+            "number": 6,
+            "startedAt": "2026-10-31T14:10:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:12:23Z",
+            "conclusion": "success",
+            "name": "Save build and test logs",
+            "number": 7,
+            "startedAt": "2026-10-31T14:12:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:12:24Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 14,
+            "startedAt": "2026-10-31T14:12:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T14:12:24Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 15,
+            "startedAt": "2026-10-31T14:12:24Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/fikrifirmanf/syntradb/actions/runs/41208519872/job/124558511216"
+      }
+    ]
+  },
+  "verified_ci_counts": {
+    "postgresql_tests": 218,
+    "python_tests": 12
+  },
+  "versions": {
+    "extension_version": "0.9.0",
+    "runner_version": "0.9.0",
+    "extension_source_fingerprint": "1c4518ec479c2179c6dfea89bc60a2a9fbb8a76e1567519c83615be7b89d699f",
+    "runner_source_fingerprint": "1c4518ec479c2179c6dfea89bc60a2a9fbb8a76e1567519c83615be7b89d699f",
+    "postgresql_configure": "'--prefix=/home/runner/work/syntradb/syntradb/.tools/postgresql-production/18.6/install' '--with-pgport=28918' '--disable-cassert' '--disable-debug' 'CFLAGS=-O2'"
+  },
+  "probe": {
+    "status": "passed",
+    "pid": 2932,
+    "samples": 98,
+    "event": "cpu-clock:u",
+    "call_graph": "dwarf,16384",
+    "frequency_hz": 49
+  },
+  "collection": {
+    "status": "complete",
+    "started_at": "2026-10-31T14:10:05.284682+00:00",
+    "soak_seconds": 240,
+    "scheduled_minutes": [
+      1,
+      3
+    ],
+    "completed_windows": [
+      1,
+      3
+    ],
+    "start_reference": "first observation of all nine named workers; within discovery polling delay",
+    "workers_seen_at": "2026-10-31T14:12:54.485342+00:00",
+    "socket": "/tmp/syntra-bench-ooAB01",
+    "actors": {
+      "applier_0": 30879,
+      "applier_1": 30880,
+      "keyed_monitor": 30882,
+      "pruner": 30881,
+      "read_committed": 30877,
+      "repeatable_read": 30878,
+      "vacuum": 30883,
+      "writer_0": 30875,
+      "writer_1": 30876
+    },
+    "discovery": {
+      "connection_attempts": 2,
+      "last_startup_error": null
+    },
+    "finished_at": "2026-10-31T14:16:10.589257+00:00"
+  },
+  "windows": [
+    {
+      "minute": 1,
+      "sample_counts": {
+        "applier_0": 8,
+        "applier_1": 5,
+        "keyed_monitor": 67,
+        "pruner": 11,
+        "read_committed": 28,
+        "repeatable_read": 176,
+        "vacuum": 0,
+        "writer_0": 59,
+        "writer_1": 55
+      },
+      "lost_samples": 0,
+      "unnamed_self_samples": 14,
+      "unnamed_shared_objects": [
+        "libc.so.6"
+      ],
+      "activity_observations": 16,
+      "activity_actor_counts": [
+        9
+      ],
+      "record_stderr": "[ perf record: Woken up 25 times to write data ]\n[ perf record: Captured and wrote 6.582 MB benchmarks/results/actions/profiles/minute-001/perf.data (409 samples) ]",
+      "report_stderr": {
+        "self.stderr": "",
+        "callchains.stderr": ""
+      }
+    },
+    {
+      "minute": 3,
+      "sample_counts": {
+        "applier_0": 6,
+        "applier_1": 4,
+        "keyed_monitor": 50,
+        "pruner": 9,
+        "read_committed": 23,
+        "repeatable_read": 152,
+        "vacuum": 0,
+        "writer_0": 32,
+        "writer_1": 33
+      },
+      "lost_samples": 0,
+      "unnamed_self_samples": 16,
+      "unnamed_shared_objects": [
+        "[vdso]",
+        "libc.so.6"
+      ],
+      "activity_observations": 16,
+      "activity_actor_counts": [
+        9
+      ],
+      "record_stderr": "[ perf record: Woken up 18 times to write data ]\n[ perf record: Captured and wrote 4.998 MB benchmarks/results/actions/profiles/minute-003/perf.data (309 samples) ]",
+      "report_stderr": {
+        "self.stderr": "",
+        "callchains.stderr": ""
+      }
+    }
+  ],
+  "soak": {
+    "duration_seconds": 240,
+    "failures": [],
+    "measured": {
+      "catalog_bytes_final": 5226496,
+      "catalog_bytes_first_released_window": 5275648,
+      "catalog_limit_bytes": 23371776,
+      "committed_writes": 13064,
+      "oldest_xmin_age_before_release": 9783,
+      "oldest_xmin_age_final": 0,
+      "peak_database_and_wal_bytes": 169460239,
+      "released_rss_growth_kib": {
+        "applier_0": 20,
+        "applier_1": 8,
+        "keyed_monitor": 472,
+        "pruner": 0,
+        "read_committed": 528,
+        "repeatable_read": 884,
+        "vacuum": 252,
+        "writer_0": 60,
+        "writer_1": 36
+      },
+      "service": {
+        "read_committed": {
+          "missed": 0,
+          "planned": 7200,
+          "scheduled_p99_ms": 3.653
+        },
+        "repeatable_read": {
+          "missed": 0,
+          "planned": 7200,
+          "scheduled_p99_ms": 13.255
+        },
+        "writer_0": {
+          "missed": 15,
+          "planned": 7200,
+          "scheduled_p99_ms": 8.231
+        },
+        "writer_1": {
+          "missed": 15,
+          "planned": 7200,
+          "scheduled_p99_ms": 8.519
+        }
+      },
+      "wal_bytes": 88570464,
+      "wal_per_committed_write_bytes": 6779
+    },
+    "quiescent_keyed_check": true,
+    "quiescent_checkpoint_reuse": true,
+    "unexpected_errors": 0,
+    "invariant_failures": 0
+  },
+  "report_sha256": "105fca5ca22359b2ce9b2331558c63061dba561c2a82090dc50f4d34867d5d6a",
+  "limitations": [
+    "Four minutes does not reproduce the two-hour held-snapshot history.",
+    "Userspace CPU samples omit kernel CPU and background workers.",
+    "Some libc frames are unnamed; raw data, errors and binaries are retained in the workflow artifact.",
+    "Profiling adds overhead; validate a future fix in an unprofiled run under unchanged limits."
+  ]
+}

@@ -72,4 +72,28 @@ and incomplete collection. They stub external process calls. Accepting boolean
 PIDs deliberately failed the identity regression; the strict check was restored.
 The explicit unittest suite runs these alongside the six existing Python tests.
 The generic test connector does not detect this standalone unittest layout.
-Actual kernel sampling still requires the native Linux preflight and smoke run.
+The native Linux preflight and smoke below verify actual kernel sampling.
+
+## Native Linux integration evidence
+
+The [four-minute smoke](https://github.com/fikrifirmanf/syntradb/actions/runs/41208524399)
+passed at `b808942`. Its preflight, collection, report generation and every soak
+gate passed. The minute 1 and 3 windows contain 409 and 309 CPU samples, with
+zero lost samples. Both retain 16 activity observations covering all nine actors.
+The idle vacuum worker had no CPU samples. PostgreSQL and SyntraDB symbols and
+call chains are readable; 14 and 16 self samples have unnamed libc or vDSO frames.
+
+Both reader workers missed zero arrivals. Each writer missed 15 of 7,200 arrivals
+(0.21%). Final keyed comparison and checkpoint reuse passed, with zero unexpected
+errors or invariant failures. This short smoke does not reproduce the earlier
+two-hour throughput failure.
+
+The [regular CI run](https://github.com/fikrifirmanf/syntradb/actions/runs/41208519872)
+also passed 218 PostgreSQL tests, 12 Python tests and the Rust checks.
+The [compact evidence](evidence/profile-smoke-linux-2026-10-31.json) preserves
+job results, sample counts, quality limits, service measurements and the original
+report checksum. Full raw files remain in the seven-day workflow artifact.
+
+The first attempt stopped before PostgreSQL was built because this runner image
+lacked `rg`. The retry installs `ripgrep` explicitly and passed without changing
+the workload or its limits.
