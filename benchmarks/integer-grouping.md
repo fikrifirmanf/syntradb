@@ -16,8 +16,11 @@ bash scripts/grouping-benchmark.sh --rows 10000 --repetitions 3
 
 The workflow lives on the default branch so GitHub can dispatch it. Its source
 ref selects the checkout to build and measure. It defaults to `main`.
-The artifact records the checked-out
-commit, which can differ from the workflow's own commit.
+The artifact records the checked-out commit, which can differ from the workflow's
+own commit. To test an unmerged workflow revision, select that branch with `--ref`
+and pass the same branch or immutable commit as `source_ref`.
+Use the full 40-character hash for a commit. Checkout treats an abbreviated hash
+as a branch or tag name.
 
 ## Workload
 
@@ -34,6 +37,18 @@ so the benchmark reads `pg_settings.boot_val` to recover that default. Native
 SQL may use parallel workers; the Rust function is parallel unsafe. The saved
 plans show whether PostgreSQL launched workers. JIT stays off for both routes.
 The report includes work memory, parallel costs, heap size and input row count.
+
+Measurement version 2 also runs each dataset at 4 MiB and 64 MiB `work_mem`,
+for 24 cases in total when the parallel default is nonzero. It sets the Rust
+group limit to the dataset budget and records that limit. The first version
+used a 65,536-group limit for every dataset and only the server's 4 MiB default.
+Keep those earlier [Linux results](integer-grouping-linux-2026-10-31.md) separate
+from the revised matrix.
+
+`work_mem` controls PostgreSQL plan nodes and the function's output tuplestore.
+It does not cap Rust's hash state or backend RSS. The higher-memory native plan
+is a control for spill costs, not proof of equal private memory use. Inspect the
+saved plans before describing a case as in-memory execution.
 
 There are no concurrent writers or captured sources in this comparison. The
 table is analyzed after bulk insertion. Both queries return ordered groups with
@@ -62,16 +77,22 @@ concurrent writes, other databases or automatic planner routing.
 
 ## Harness verification
 
-A local million-row run completed all 12 cases with three timed samples per
-route. Every dataset filled its intended group budget, all groups matched native
-SQL, and the native default-parallel plans launched two workers. This validates
-the harness; Linux performance results are still pending.
+A local million-row run completed all 24 version-2 cases with three timed
+samples per route. Every dataset filled its group budget, every Rust cap matched
+that budget, and all groups matched native SQL. All native 64 MiB plans wrote
+zero temporary blocks. The [native Linux run](integer-grouping-memory-linux-2026-10-31.md) also passed
+all 24 cases with 15 samples per route.
 
 Changing the Rust query's sums deliberately caused a result mismatch. The command
 failed and wrote no timing report. That change was restored. The workflow's
 report verifier also rejected a missing case, a missing timing sample and a
 wrong row count. The NULL-key cadence is coprime with each key cycle, so it does
 not permanently remove key slots.
+The revised report verifier also rejects wrong memory settings, an incorrect
+Rust group cap and an unknown measurement version. It accepts both complete
+version-1 and version-2 matrices so earlier source refs remain usable.
+Reducing the bound parameter by one deliberately failed the real database run
+with `54000` and produced no timing report. The correct parameter was restored.
 The generic missing-test mapper expects a separate `.test.rs` file for this
 module. Here the real database run exercises the measurement and comparison
 logic directly. The SQL API also has separate PostgreSQL regression tests.
