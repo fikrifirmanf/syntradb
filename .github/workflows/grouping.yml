@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: Source branch or commit containing scripts/grouping-benchmark.sh
+        description: Source branch, tag or full 40-character commit hash
         type: string
         default: 'main'
       rows:

@@ -19,6 +19,8 @@ ref selects the checkout to build and measure. It defaults to `main`.
 The artifact records the checked-out commit, which can differ from the workflow's
 own commit. To test an unmerged workflow revision, select that branch with `--ref`
 and pass the same branch or immutable commit as `source_ref`.
+Use the full 40-character hash for a commit. Checkout treats an abbreviated hash
+as a branch or tag name.
 
 ## Workload
 
