@@ -2,8 +2,10 @@
 
 The explicit [integer grouping API](heap-grouped-aggregates.md) passed the local
 checks below on macOS arm64 with PostgreSQL 18.6 and Rust 1.99.0.
-Native Linux results are pending. These checks establish bounded API behavior;
-they do not establish production readiness or an analytical speedup.
+The [native Linux CI run](https://github.com/fikrifirmanf/syntradb/actions/runs/41170122491)
+also passed all 218 PostgreSQL tests and the other checks at commit `98b0322`.
+These checks establish bounded API behavior; they do not establish production
+readiness or an analytical speedup.
 
 ## Correctness and visibility
 
@@ -53,8 +55,9 @@ and `downgrade-080-to-060`.
 
 ## Open requirements
 
-The GitHub workflow now contains 24 recovery and lifecycle cases. Its complete
-0.8.0 run remains required before merging this feature. Grouping has no planner
+The GitHub workflow now contains 24 recovery and lifecycle cases. The
+[complete 0.8.0 run](https://github.com/fikrifirmanf/syntradb/actions/runs/41170126490)
+is still running and remains required before merging this feature. Grouping has no planner
 substitution, filters, multiple keys or spill to disk. The earlier two-hour
 checkpoint soak failed its offered-load limits; this additive API does not fix
 that throughput problem.
