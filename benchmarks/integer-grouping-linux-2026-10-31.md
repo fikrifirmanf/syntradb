@@ -57,7 +57,29 @@ records the actual source commit, workflow commit, source fingerprint, runner
 details and original report SHA-256. The workflow commit differs from the source
 because its source-ref input selected a feature branch.
 
-A [repeat with 15 samples](https://github.com/fikrifirmanf/syntradb/actions/runs/41171390584)
-is running against the same immutable source commit. Compare its runner details
-before combining observations. The checkpoint throughput gate remains open;
-this isolated grouping workload does not address the earlier held-snapshot failure.
+## Repeat on another host model
+
+The [15-sample repeat](https://github.com/fikrifirmanf/syntradb/actions/runs/41171390584)
+also passed all 12 cases against the same immutable source commit. Its runner
+used an AMD EPYC 9V74 host, with the same four vCPUs and runner image. It was
+slower overall, so do not combine its absolute timings with the first run.
+The [second evidence file](evidence/grouping-linux-2026-10-31-run2.json) retains
+its samples and plans separately.
+
+| Layout | Groups | Native serial | Rust, serial setting | Native, two workers allowed | Rust, two workers allowed |
+|---|---:|---:|---:|---:|---:|
+| int4/int4 | 16 | 123.2 | 88.2 | 63.9 | 88.9 |
+| int4/int4 | 1,024 | 130.2 | 96.4 | 68.6 | 95.7 |
+| int4/int4 | 65,536 | 241.0 | 185.7 | 219.7 | 183.6 |
+| int8/int8 | 16 | 122.4 | 90.8 | 65.0 | 90.4 |
+| int8/int8 | 1,024 | 131.8 | 98.9 | 69.3 | 99.1 |
+| int8/int8 | 65,536 | 246.2 | 241.2 | 236.9 | 255.7 |
+
+Native parallel plans again won at the smaller group counts. At 65,536 wide
+groups, Rust's serial advantage shrank to about 2%, and the native parallel
+median was lower than Rust's. The large-group result is therefore mixed across
+these hosts and remains subject to the memory caveat above. Add an in-memory
+native control before attributing the difference to the grouping kernel.
+
+The checkpoint throughput gate remains open. This isolated grouping workload
+does not address the earlier held-snapshot failure.
