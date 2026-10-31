@@ -80,8 +80,8 @@ concurrent writes, other databases or automatic planner routing.
 A local million-row run completed all 24 version-2 cases with three timed
 samples per route. Every dataset filled its group budget, every Rust cap matched
 that budget, and all groups matched native SQL. All native 64 MiB plans wrote
-zero temporary blocks. This validates the revised harness; its Linux results
-are pending.
+zero temporary blocks. The [native Linux run](integer-grouping-memory-linux-2026-10-31.md) also passed
+all 24 cases with 15 samples per route.
 
 Changing the Rust query's sums deliberately caused a result mismatch. The command
 failed and wrote no timing report. That change was restored. The workflow's
