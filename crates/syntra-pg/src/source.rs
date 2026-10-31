@@ -26,6 +26,52 @@ struct SourceScan<'a, V = i32> {
 }
 
 impl<'a, V> SourceScan<'a, V> {
+    fn with_time_range(
+        relation: &'a PgRelation,
+        attribute: i16,
+        snapshot: pg_sys::Snapshot,
+        time_attribute: i16,
+        range: TimeRange,
+    ) -> Self {
+        let (ge, lt) = match range.column_type {
+            pg_sys::DATEOID => (pg_sys::F_DATE_GE, pg_sys::F_DATE_LT),
+            pg_sys::TIMESTAMPOID => (pg_sys::F_TIMESTAMP_GE, pg_sys::F_TIMESTAMP_LT),
+            pg_sys::TIMESTAMPTZOID => (pg_sys::F_TIMESTAMPTZ_GE, pg_sys::F_TIMESTAMPTZ_LT),
+            _ => unsupported("unsupported time filter type"),
+        };
+        // SAFETY: the caller validates both stored attributes under the relation
+        // lock. Typed SQL adapters supply by-value date/timestamp Datums matching
+        // column_type. Native built-in comparisons enforce [lower, upper),
+        // including infinity and NULL semantics. heap_beginscan copies the keys;
+        // the snapshot and relation remain owned by this backend for the scan.
+        unsafe {
+            let mut keys = [pg_sys::ScanKeyData::default(); 2];
+            pg_sys::ScanKeyInit(
+                &mut keys[0],
+                time_attribute,
+                pg_sys::BTGreaterEqualStrategyNumber as u16,
+                pg_sys::Oid::from(ge),
+                range.lower,
+            );
+            pg_sys::ScanKeyInit(
+                &mut keys[1],
+                time_attribute,
+                pg_sys::BTLessStrategyNumber as u16,
+                pg_sys::Oid::from(lt),
+                range.upper,
+            );
+            let scan = pg_sys::table_beginscan(relation.as_ptr(), snapshot, 2, keys.as_mut_ptr());
+            let slot = pg_sys::table_slot_create(relation.as_ptr(), std::ptr::null_mut());
+            Self {
+                scan,
+                slot,
+                attribute,
+                _relation: PhantomData,
+                _value: PhantomData,
+            }
+        }
+    }
+
     fn new(relation: &'a PgRelation, attribute: i16, snapshot: pg_sys::Snapshot) -> Self {
         // SAFETY: as in `with_predicate`, without scan keys.
         unsafe {
@@ -430,6 +476,84 @@ pub(super) type SummaryRow = (i64, i64, Option<i64>, Option<i32>, Option<i32>);
 /// exceed `bigint`, as PostgreSQL's `sum(bigint)` returning `numeric` allows.
 pub(super) type WideSummary = (i64, i64, Option<i128>, Option<i64>, Option<i64>);
 
+/// Only typed SQL adapters construct these by-value Datums. The source column
+/// must have exactly column_type; implicit timestamp/time-zone casts are refused.
+pub(super) struct TimeRange {
+    pub(super) column_type: pg_sys::Oid,
+    pub(super) lower: pg_sys::Datum,
+    pub(super) upper: pg_sys::Datum,
+}
+
+pub(super) fn time_summary(
+    source: &PgRelation,
+    value: &str,
+    time: &str,
+    range: TimeRange,
+) -> (WideSummary, i64, crate::numeric::Scale) {
+    let (value, value_type) = validate_column(
+        source,
+        value,
+        &[
+            pg_sys::INT2OID,
+            pg_sys::INT4OID,
+            pg_sys::INT8OID,
+            pg_sys::NUMERICOID,
+        ],
+        "time summaries require a stored integer or fixed-scale numeric value column",
+    );
+    let (time, _) = validate_column(
+        source,
+        time,
+        &[range.column_type],
+        "time filter column must be stored and match the bounds' date or timestamp type",
+    );
+    let snapshot = heap_snapshot();
+    let scale = if value_type == pg_sys::NUMERICOID {
+        let typmod = source
+            .tuple_desc()
+            .iter()
+            .find(|a| a.attnum == value)
+            .map(|a| a.atttypmod)
+            .unwrap_or(-1);
+        crate::numeric::from_typmod(typmod).unwrap_or_else(|| {
+            unsupported("time summaries require numeric(p,s) with 1 <= p <= 18 and 0 <= s <= p")
+        })
+    } else {
+        crate::numeric::Scale {
+            precision: 18,
+            scale: 0,
+        }
+    };
+    let (summary, nans) = match value_type {
+        pg_sys::INT2OID => (
+            integer_summary(
+                SourceScan::<i16>::with_time_range(source, value, snapshot, time, range)
+                    .map(|v| v.map(i64::from)),
+            ),
+            0,
+        ),
+        pg_sys::INT4OID => (
+            integer_summary(
+                SourceScan::<i32>::with_time_range(source, value, snapshot, time, range)
+                    .map(|v| v.map(i64::from)),
+            ),
+            0,
+        ),
+        pg_sys::INT8OID => (
+            integer_summary(SourceScan::<i64>::with_time_range(
+                source, value, snapshot, time, range,
+            )),
+            0,
+        ),
+        pg_sys::NUMERICOID => numeric_summary(
+            SourceScan::<pgrx::AnyNumeric>::with_time_range(source, value, snapshot, time, range),
+            scale,
+        ),
+        _ => unsupported("unsupported time summary value type"),
+    };
+    (summary, nans, scale)
+}
+
 pub(super) fn widen(s: SummaryRow) -> WideSummary {
     (
         s.0,
@@ -446,8 +570,12 @@ pub(super) fn heap_int8_summary_checked(
     attribute: i16,
     snapshot: pg_sys::Snapshot,
 ) -> WideSummary {
+    integer_summary(SourceScan::<i64>::new(source, attribute, snapshot))
+}
+
+fn integer_summary(rows: impl Iterator<Item = Option<i64>>) -> WideSummary {
     let mut summary = syntra_core::Int8Summary::default();
-    for (index, value) in SourceScan::<i64>::new(source, attribute, snapshot).enumerate() {
+    for (index, value) in rows.enumerate() {
         if index % 1024 == 0 {
             pgrx::check_for_interrupts!();
         }
@@ -478,11 +606,19 @@ pub(super) fn heap_numeric_summary_checked(
     snapshot: pg_sys::Snapshot,
     scale: crate::numeric::Scale,
 ) -> (WideSummary, i64) {
+    numeric_summary(
+        SourceScan::<pgrx::AnyNumeric>::new(source, attribute, snapshot),
+        scale,
+    )
+}
+
+fn numeric_summary(
+    rows: impl Iterator<Item = Option<pgrx::AnyNumeric>>,
+    scale: crate::numeric::Scale,
+) -> (WideSummary, i64) {
     let mut summary = syntra_core::Int8Summary::default();
     let mut nans = 0_i64;
-    for (index, value) in
-        SourceScan::<pgrx::AnyNumeric>::new(source, attribute, snapshot).enumerate()
-    {
+    for (index, value) in rows.enumerate() {
         if index % 1024 == 0 {
             pgrx::check_for_interrupts!();
         }

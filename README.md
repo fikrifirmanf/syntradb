@@ -9,6 +9,10 @@ versioned single-column segments, group scans, SQL functions and a pass-through
 planner hook. You can persist encoded segments in ordinary PostgreSQL `bytea`
 columns and scan them explicitly. Source capture records snapshot provenance for
 fixed projections. Named copies now have an owner-isolated catalog and atomic refresh. Opt-in capture and durable checkpoints synchronize supported int2, int4 and int8 sources, with int2, int4, int8 or `numeric(p,s)` (p ≤ 18) values; see [numeric columns](docs/numeric-design.md).
+
+Fresh [time-window aggregates](docs/temporal-aggregates.md) filter `date`,
+`timestamp` or `timestamptz` columns while summarizing integer or fixed-scale
+decimal values. They use explicit SQL functions and the caller's MVCC snapshot.
 Automatic analytical paths remain unimplemented. The [baseline harness](benchmarks/README.md) compares the prototype
 with PostgreSQL on declared workloads.
 

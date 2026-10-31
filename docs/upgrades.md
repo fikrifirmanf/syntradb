@@ -433,6 +433,29 @@ The [provenance record](../build-support/upgrade-baselines/syntradb-0.8.0-src.js
 lists the exclusions. This archive is a baseline library build input; older
 baseline archives remain separate in the repository.
 
+## 0.9.0 to 0.10.0
+
+0.10.0 adds three [time-window aggregate functions](temporal-aggregates.md).
+The SQL update adds their public declarations. Capture catalogs, stored bytes
+and existing function signatures do not change. Writers and maintenance keep
+working before and during this additive SQL update.
+
+Install the new library, restart sessions that loaded the older library, then
+run `ALTER EXTENSION syntradb UPDATE` in each database. Restart PostgreSQL if
+the library is preloaded. The new APIs become callable after the SQL update;
+loading the library alone does not add their declarations.
+
+To downgrade, run `ALTER EXTENSION syntradb UPDATE TO '0.9.0'` while the 0.10.0
+library remains installed. Dependent views block removal of the temporal APIs
+and the update rolls back. Drop those dependencies explicitly before retrying.
+Then install the 0.9.0 library and restart sessions, or PostgreSQL if preloaded.
+The downgrade removes only these three APIs and keeps capture history.
+
+`scripts/downgrade-0.10.0-check.sh` exercises both libraries, pending history,
+atomic dependency refusal and catalog equality with fresh installs. The
+[verification record](verification-0.10.0.md) distinguishes local results from
+pending native Linux checks.
+
 ## Upgrade check
 
 ```sh
@@ -444,6 +467,7 @@ bash scripts/upgrade-check.sh 0.5.0    # from 0.5.0
 bash scripts/upgrade-check.sh 0.6.0    # from 0.6.0
 bash scripts/upgrade-check.sh 0.7.0    # from 0.7.0
 bash scripts/upgrade-check.sh 0.8.0    # from 0.8.0
+bash scripts/upgrade-check.sh 0.9.0    # from 0.9.0
 ```
 
 The check builds the archived source

@@ -53,6 +53,7 @@ mod numeric;
 mod planner;
 mod segment;
 mod source;
+mod temporal;
 mod tracking;
 
 pgrx::pg_module_magic!();
@@ -134,6 +135,7 @@ mod tests {
     include!("tracking_tests.rs");
     include!("ddl_tests.rs");
     include!("heap_tests.rs");
+    include!("temporal_tests.rs");
     include!("grouping_tests.rs");
     include!("live_tests.rs");
     include!("capture_tests.rs");

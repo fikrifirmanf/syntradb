@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Upgrade a database while captured writers are running. Writers start right after
 # the new library is installed. From 0.1.0 or 0.2.0 they fail closed until ALTER
-# EXTENSION UPDATE commits, then succeed; from 0.3.0 through 0.8.0 every write
+# EXTENSION UPDATE commits, then succeed; from 0.3.0 through 0.9.0 every write
 # must succeed: the new library captures with the old schema's row trigger, and
 # the update only makes writers wait while it replaces that trigger. From 0.6.0
 # the apply loop fails until the update creates the delta table. From 0.7.0,
@@ -19,7 +19,7 @@ cd "$SYNTRA_ROOT"
 FROM="${1:-0.2.0}"
 SECONDS_RUN="${2:-30}"
 TPS="${3:-100}"
-[[ "$FROM" =~ ^0\.[1-8]\.0$ ]] || { echo "upgrade load check: from-version must be 0.1.0 through 0.8.0" >&2; exit 2; }
+[[ "$FROM" =~ ^0\.[1-9]\.0$ ]] || { echo "upgrade load check: from-version must be 0.1.0 through 0.9.0" >&2; exit 2; }
 for value in "$SECONDS_RUN" "$TPS"; do
     [[ "$value" =~ ^[1-9][0-9]{0,3}$ ]] || { echo "upgrade load check: '$value' is not a positive integer" >&2; exit 2; }
 done

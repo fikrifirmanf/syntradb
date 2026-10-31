@@ -17,6 +17,9 @@ enum ReadPath {
     Heap,
     Range,
     Grouping,
+    Date,
+    Timestamp,
+    Timestamptz,
     Native,
     NativeRange,
 }
@@ -27,6 +30,9 @@ impl ReadPath {
             Self::Heap => "SELECT sum FROM syntra_heap_int4_summary('ssi_source','v') LIMIT 1",
             Self::Range => "SELECT sum FROM syntra_heap_int4_range_summary('ssi_source','v',1,1) LIMIT 1",
             Self::Grouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_integer_summary('ssi_source','k','v')",
+            Self::Date => "SELECT sum::bigint FROM syntra_heap_date_summary('ssi_source','v','d','2026-01-01','2026-01-02') LIMIT 1",
+            Self::Timestamp => "SELECT sum::bigint FROM syntra_heap_timestamp_summary('ssi_source','v','t','2026-01-01','2026-01-02') LIMIT 1",
+            Self::Timestamptz => "SELECT sum::bigint FROM syntra_heap_timestamptz_summary('ssi_source','v','z','2026-01-01+00','2026-01-02+00') LIMIT 1",
             Self::Native => "SELECT sum(v)::bigint FROM ssi_source",
             Self::NativeRange => "SELECT sum(v)::bigint FROM ssi_source WHERE v=1",
         }
@@ -78,7 +84,19 @@ fn conflict(
             "SELECT count(*)=1 FROM ssi_source WHERE v=1",
         ),
     };
-    admin.batch_execute(seed)?;
+    if matches!(scenario, Scenario::RangePhantom)
+        && (matches!(
+            a,
+            ReadPath::Date | ReadPath::Timestamp | ReadPath::Timestamptz
+        ) || matches!(
+            b,
+            ReadPath::Date | ReadPath::Timestamp | ReadPath::Timestamptz
+        ))
+    {
+        admin.batch_execute("TRUNCATE ssi_source; INSERT INTO ssi_source VALUES(10,10,'2026-02-01','2026-02-01','2026-02-01+00')")?;
+    } else {
+        admin.batch_execute(seed)?;
+    }
     let mut first = cluster.connect("syntra_enabled")?;
     let mut second = cluster.connect("syntra_enabled")?;
     first.batch_execute(
@@ -114,14 +132,21 @@ fn conflict(
 
 pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     let mut admin = cluster.connect("syntra_enabled")?;
-    admin.batch_execute("CREATE TABLE ssi_source(k int4 PRIMARY KEY,v int4); INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
+    admin.batch_execute("CREATE TABLE ssi_source(k int4 PRIMARY KEY,v int4,d date DEFAULT '2026-01-01',t timestamp DEFAULT '2026-01-01',z timestamptz DEFAULT '2026-01-01+00'); INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
     let mut reader = cluster.connect("syntra_enabled")?;
     for mode in [
         "BEGIN ISOLATION LEVEL SERIALIZABLE",
         "BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY",
         "BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY DEFERRABLE",
     ] {
-        for path in [ReadPath::Heap, ReadPath::Range, ReadPath::Grouping] {
+        for path in [
+            ReadPath::Heap,
+            ReadPath::Range,
+            ReadPath::Grouping,
+            ReadPath::Date,
+            ReadPath::Timestamp,
+            ReadPath::Timestamptz,
+        ] {
             reader.batch_execute(mode)?;
             require(
                 path.read(&mut reader)? == Some(2),
@@ -139,7 +164,14 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
             reader.batch_execute("COMMIT")?;
         }
     }
-    for path in [ReadPath::Heap, ReadPath::Range, ReadPath::Grouping] {
+    for path in [
+        ReadPath::Heap,
+        ReadPath::Range,
+        ReadPath::Grouping,
+        ReadPath::Date,
+        ReadPath::Timestamp,
+        ReadPath::Timestamptz,
+    ] {
         for (a, b) in [
             (path, path),
             (path, ReadPath::Native),
@@ -149,18 +181,32 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
             conflict(cluster, &mut admin, a, b, Scenario::EmptyPhantom)?;
         }
     }
-    for (a, b) in [
-        (ReadPath::Range, ReadPath::Range),
-        (ReadPath::Range, ReadPath::NativeRange),
-        (ReadPath::NativeRange, ReadPath::Range),
+    for path in [
+        ReadPath::Range,
+        ReadPath::Date,
+        ReadPath::Timestamp,
+        ReadPath::Timestamptz,
     ] {
-        conflict(cluster, &mut admin, a, b, Scenario::RangePhantom)?;
+        for (a, b) in [
+            (path, path),
+            (path, ReadPath::NativeRange),
+            (ReadPath::NativeRange, path),
+        ] {
+            conflict(cluster, &mut admin, a, b, Scenario::RangePhantom)?;
+        }
     }
 
     // Force the pivot's outgoing conflict while a Rust heap scan is running,
     // rather than only exercising 40001 from a later native UPDATE.
     admin.batch_execute("CREATE TABLE ssi_pivot_input(k int4 PRIMARY KEY,v int4)")?;
-    for path in [ReadPath::Heap, ReadPath::Range, ReadPath::Grouping] {
+    for path in [
+        ReadPath::Heap,
+        ReadPath::Range,
+        ReadPath::Grouping,
+        ReadPath::Date,
+        ReadPath::Timestamp,
+        ReadPath::Timestamptz,
+    ] {
         admin.batch_execute("TRUNCATE ssi_source,ssi_pivot_input; INSERT INTO ssi_source VALUES(1,1); INSERT INTO ssi_pivot_input VALUES(1,1)")?;
         let mut incoming = cluster.connect("syntra_enabled")?;
         let mut pivot = cluster.connect("syntra_enabled")?;
@@ -207,6 +253,44 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     }
     admin.batch_execute("DROP TABLE ssi_pivot_input")?;
 
+    for path in [ReadPath::Date, ReadPath::Timestamp, ReadPath::Timestamptz] {
+        admin.batch_execute("TRUNCATE ssi_source; INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
+        reader.batch_execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")?;
+        require(
+            path.read(&mut reader)? == Some(2),
+            "temporal RR initial read changed",
+        )?;
+        admin.batch_execute(
+            "UPDATE ssi_source SET v=7,d='2026-02-01',t='2026-02-01',z='2026-02-01+00' WHERE k=1",
+        )?;
+        require(
+            path.read(&mut reader)? == Some(2),
+            "temporal RR lost its retained snapshot",
+        )?;
+        reader.batch_execute("COMMIT")?;
+        require(
+            path.read(&mut reader)? == Some(1),
+            "temporal fresh snapshot missed the changed time predicate",
+        )?;
+    }
+
+    admin.batch_execute("CREATE TABLE temporal_cancel(v int4,d date,t timestamp,z timestamptz); INSERT INTO temporal_cancel SELECT g,date '2026-01-01',timestamp '2026-01-01',timestamptz '2026-01-01+00' FROM generate_series(1,1000000) g")?;
+    for sql in [
+        "SELECT rows FROM syntra_heap_date_summary('temporal_cancel','v','d','2026-01-01','2026-01-02')",
+        "SELECT rows FROM syntra_heap_date_summary('temporal_cancel','v','d','2100-01-01','2100-01-02')",
+        "SELECT rows FROM syntra_heap_timestamp_summary('temporal_cancel','v','t','2026-01-01','2026-01-02')",
+        "SELECT rows FROM syntra_heap_timestamp_summary('temporal_cancel','v','t','2100-01-01','2100-01-02')",
+        "SELECT rows FROM syntra_heap_timestamptz_summary('temporal_cancel','v','z','2026-01-01+00','2026-01-02+00')",
+        "SELECT rows FROM syntra_heap_timestamptz_summary('temporal_cancel','v','z','2100-01-01+00','2100-01-02+00')",
+    ] {
+        reader.batch_execute("SET statement_timeout='1ms'")?;
+        let error = reader.query(sql, &[]).err().ok_or("temporal scan ignored statement_timeout")?;
+        require(error.code().is_some_and(|code| code.code()=="57014"), "temporal cancellation returned the wrong SQLSTATE")?;
+        reader.batch_execute("SET statement_timeout='5s'")?;
+        require(reader.query_one("SELECT rows=1000000 AND sum=500000500000 FROM syntra_heap_date_summary('temporal_cancel','v','d','2026-01-01','2026-01-02')", &[])?.try_get(0)?, "temporal backend did not recover after cancellation")?;
+    }
+    admin.batch_execute("DROP TABLE temporal_cancel")?;
+
     // Source capture and reusable state keep the old restriction. They have no
     // proof yet that their metadata reads supply the source's SSI dependencies.
     admin.batch_execute("TRUNCATE ssi_source; INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
@@ -229,13 +313,15 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     }
     admin.query_one("SELECT syntra_stop_capture('ssi_source')", &[])?;
     admin.batch_execute("DROP TABLE ssi_source")?;
-    eprintln!("SSI checks: nine fresh-read modes, 21 conflicting transaction pairs, three read-time aborts with backend reuse and three cached/capture guards passed");
+    eprintln!("SSI checks: 18 fresh-read modes, 48 conflicting transaction pairs, six read-time aborts with backend reuse, three temporal repeatable-read snapshots and three cached/capture guards passed");
     Ok(vec![
         "serializable read-write, read-only and deferrable fresh reads without assigned XIDs",
         "source relation predicate locks, including empty and unmatched range reads",
         "write skew aborts one transaction with 40001 for custom and mixed native/custom reads",
         "empty-table and range-insertion phantoms abort one transaction with 40001",
         "read-time 40001 unwinds each native heap scan and permits reuse after rollback",
+        "date, timestamp and timestamptz filters retain RR snapshots across concurrent predicate/value changes",
+        "matching and fully filtered temporal scans honor cancellation and allow subsequent backend reuse",
         "native invariants checked after participant transactions, without masking custom dependencies",
         "capture, live reuse and checkpoint reuse remain explicitly unsupported under SSI",
     ])

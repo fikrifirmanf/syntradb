@@ -150,14 +150,15 @@ def verify(bundle, pg_config, scratch, version, expected_fingerprint):
         try:
             run([binary / 'pg_ctl', '-D', data, '-l', scratch / 'postgresql.log', '-w', '-t', '60', 'start'])
             sql = """CREATE EXTENSION syntradb;
-CREATE TABLE package_source(id int4 PRIMARY KEY, v int4);
-INSERT INTO package_source VALUES (1,10),(2,20);
+CREATE TABLE package_source(id int4 PRIMARY KEY, v int4,created_at timestamptz DEFAULT '2026-01-01+00');
+INSERT INTO package_source(id,v) VALUES (1,10),(2,20);
 SELECT syntra_seed_capture('package_source','id','v',64);
 UPDATE package_source SET v=v+1 WHERE id=1;
 SELECT applied,pruned FROM syntra_apply_prune_capture('package_source');
 SELECT json_build_object('version',syntra_version(),'profile',syntra_build_profile(),
  'fingerprint',syntra_source_fingerprint(),'rows',s.rows,'sum',s.sum,'route',s.route,
- 'pending',(SELECT pending_events FROM syntra_capture_lag('package_source')))
+ 'pending',(SELECT pending_events FROM syntra_capture_lag('package_source')),
+ 'time_sum',(SELECT sum FROM syntra_heap_timestamptz_summary('package_source','v','created_at','2026-01-01+00','2026-01-02+00')))
 FROM syntra_checkpoint_int4_summary('package_source','v') AS s;
 BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY;
 SELECT rows,sum FROM syntra_heap_int4_summary('package_source','v');
@@ -169,7 +170,7 @@ COMMIT;
             result.check_returncode()
             rows = [json.loads(line) for line in result.stdout.splitlines() if line.startswith('{')]
             expected = {'version': version, 'profile': 'release', 'fingerprint': expected_fingerprint,
-                        'rows': 2, 'sum': 31, 'route': 'checkpoint', 'pending': 0}
+                        'rows': 2, 'sum': 31, 'route': 'checkpoint', 'pending': 0, 'time_sum': 31}
             if rows != [expected] or '\n2|31\n' not in '\n' + result.stdout:
                 raise ValueError('packaged extension failed version, fingerprint, capture, checkpoint or SSI checks')
             return {'status': 'passed', 'checks': expected, 'fresh_heap_ssi': '2|31', 'private_install': True}

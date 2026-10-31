@@ -5,6 +5,10 @@ Version 0.9.0 enables serializable transactions for the explicit fresh heap APIs
 - `syntra_heap_int4_summary` and `syntra_heap_int4_range_summary`.
 - `syntra_heap_group_integer_summary` for its supported integer layouts.
 
+Version 0.10.0 adds the three [temporal aggregate APIs](temporal-aggregates.md)
+under the same fresh-scan contract. Their local conflict and snapshot checks are
+recorded in [0.10.0 verification](verification-0.10.0.md).
+
 These calls use the caller's active MVCC snapshot. Their native PostgreSQL table
 scan acquires a source relation predicate lock and checks outgoing serialization
 conflicts while examining tuple visibility. Empty results and unmatched ranges
