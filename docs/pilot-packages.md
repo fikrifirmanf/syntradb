@@ -20,11 +20,10 @@ target is PostgreSQL 18.6 built with the repository's production flags. The
 bundle is specific to the build host's target and dependencies. Linux CI checks
 Ubuntu 24.04 x86_64; local macOS builds need their own installation evidence.
 
-The bundle contains `lib/syntradb.so` (`.dylib` on macOS), the generated install SQL,
-every version transition script, the control file, license, repository source
-archive, build manifest and verification result. The source archive records the
-exact Git commit. Dependencies remain pinned in Cargo.lock; this is not an
-offline vendor bundle.
+The bundle contains `lib/syntradb.so` (`.dylib` on macOS), install SQL and every
+upgrade script. It also includes the control file, license, source archive,
+build manifest and test result. The source archive records the exact Git commit.
+Dependencies remain pinned in Cargo.lock; this is not an offline vendor bundle.
 
 The manifest records compiler, PostgreSQL flags, platform, source fingerprint
 and file checksums. Archive metadata is stable for identical staged bytes.
@@ -42,8 +41,8 @@ It starts a disposable cluster using a private Unix socket. It then checks:
 - a fresh heap read in a serializable transaction.
 
 Every check must pass before the final archive and SHA256SUMS file are written.
-The verifier also unpacks a candidate archive, checks its exact file bytes, and
-repeats installation from those extracted files before naming the final archive.
+It also unpacks a test archive and checks each file's bytes. A second fresh
+cluster loads those files before the tool names the final archive.
 The cluster stops on both success and failure. Build and SQL logs remain beside
 the bundle. A failed build never produces a verified final archive.
 
@@ -51,7 +50,25 @@ Six offline tests cover platform library names, payload tampering, missing and
 extra files, unsafe archives, stable archives and the source-fingerprint format. Disabling the
 manifest comparison made the tampering test fail; the comparison was restored.
 Native installation checks provide separate evidence beyond these offline tests.
+The generic test connector does not detect this standalone unittest layout;
+`scripts/check.sh` runs explicit unittest discovery.
 
 Regular CI retains the pilot archive, manifest, verification result and logs
 for seven days. It publishes no release tag and deploys no database. Full
 recovery and lifecycle checks remain separate from this installation smoke.
+
+## Local verification
+
+The macOS arm64 bundle passed both staged and extracted-archive installation
+checks at `fdaa7a2`. Its PostgreSQL and extension profiles match the pinned
+production configuration, and its runtime source fingerprint matches the source
+snapshot. The [versioned evidence](../benchmarks/evidence/pilot-package-macos-2026-11-01.json)
+records the archive checksum, file manifest, SQL output and negative controls.
+
+A wrong expected fingerprint failed verification. Removing the bundle's library
+failed extension creation despite an older library in the original PostgreSQL
+prefix. Both failed test clusters stopped. This checks that verification loads
+the packaged assets and propagates failures.
+
+The explicit Python suite passed 18 tests, including six packaging tests.
+Linux installation CI is pending; local success does not establish Linux support.
