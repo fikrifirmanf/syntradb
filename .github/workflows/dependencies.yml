@@ -1,0 +1,50 @@
+name: Dependency advisories
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * 1'
+  push:
+    paths:
+      - Cargo.lock
+      - fuzz/Cargo.lock
+      - scripts/dependency-audit.sh
+      - .github/workflows/dependencies.yml
+  pull_request:
+    paths:
+      - Cargo.lock
+      - fuzz/Cargo.lock
+      - scripts/dependency-audit.sh
+      - .github/workflows/dependencies.yml
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: dependency-advisories-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned advisory scanner
+        run: cargo install cargo-audit --version 0.22.2 --locked --root .tools/audit
+      - name: Audit workspace and fuzz dependencies
+        run: bash scripts/dependency-audit.sh
+      - name: Save advisory reports and database revision
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-advisories-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmarks/results/dependency-audit/
+          if-no-files-found: warn
+          retention-days: 7
