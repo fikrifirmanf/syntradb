@@ -84,11 +84,20 @@ jobs:
           benchmark = report['grouping_benchmark']
           default = benchmark['parallel_workers_default']
           workers = [0] if default == 0 else [0, default]
-          expected = {(layout, budget, worker) for layout in ['int4/int4', 'int8/int8']
-                      for budget in [16, 1024, 65536] for worker in workers}
+          version = benchmark.get('measurement_version', 1)
+          if version == 1:
+              memories = [None]
+          elif version == 2 and benchmark['work_mem_kib_settings'] == [4096, 65536]:
+              memories = [4096, 65536]
+          else:
+              raise SystemExit('Unsupported grouping measurement version or memory controls')
+          expected = {(layout, budget, worker, memory) for layout in ['int4/int4', 'int8/int8']
+                      for budget in [16, 1024, 65536] for worker in workers for memory in memories}
           observed = set()
           for case in benchmark['cases']:
-              observed.add((case['layout'], case['group_budget'], case['max_parallel_workers_per_gather']))
+              observed.add((case['layout'], case['group_budget'], case['max_parallel_workers_per_gather'], case.get('work_mem_kib')))
+              if version == 2 and case['rust_max_groups'] != case['group_budget']:
+                  raise SystemExit('Rust grouping cap does not match the recorded dataset budget')
               result = case['measurement']
               if case['input_rows'] != int(os.environ['BENCH_ROWS']) or result['result_rows'] != case['input_rows']:
                   raise SystemExit('Wrong row count in grouping comparison')
