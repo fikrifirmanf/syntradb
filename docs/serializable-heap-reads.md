@@ -48,6 +48,7 @@ that restriction can change. Fresh heap support does not enable those paths.
 Install the 0.9.0 library, restart sessions that loaded 0.8.0, then run
 `ALTER EXTENSION syntradb UPDATE` in each database. SQL signatures, capture
 catalogs and stored bytes are unchanged. The update advances the version marker.
+If the library is preloaded, restart PostgreSQL to replace the postmaster's loaded copy.
 Fresh SSI behavior follows the loaded library, including the window before the
 catalog update. Existing trusted projections fail their version check and use
 the established fallback.

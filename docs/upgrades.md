@@ -410,6 +410,7 @@ Install the new library, restart sessions that loaded the old library, then run
 including before the catalog update. Capture and cached-state calls remain
 unsupported under serializable isolation. Existing trusted projections fail
 their library-version check and fall back through the established route.
+If the library is preloaded, restart PostgreSQL rather than only its client sessions.
 
 ## 0.9.0 to 0.8.0 (downgrade)
 

@@ -1,0 +1,50 @@
+{
+  "format_version": "syntra_local_correctness_evidence_v1",
+  "scope": "local native PostgreSQL correctness checks; not a performance or Linux result",
+  "source_commit": "14f72d1617b02b05ce68b6d3675f8b5cad34f84e",
+  "original_report_sha256": "87a184d3a20faf34677a186c93bc77823b95b60870bbe0dcc6025345ab8cd9bf",
+  "command": [
+    "bash",
+    "scripts/benchmark-production.sh",
+    "--mixed-seconds",
+    "0",
+    "--rows",
+    "1000",
+    "--repetitions",
+    "3"
+  ],
+  "postgresql": "PostgreSQL 18.6 on aarch64-apple-darwin27.0.0, compiled by Apple clang version 21.0.0 (clang-2100.3.34.2), 64-bit",
+  "os": "macos",
+  "architecture": "aarch64",
+  "extension_version": "0.9.0",
+  "extension_profile": "release",
+  "runner_profile": "release",
+  "source_fingerprint": "1c4518ec479c2179c6dfea89bc60a2a9fbb8a76e1567519c83615be7b89d699f",
+  "ssi_checks": [
+    "serializable read-write, read-only and deferrable fresh reads without assigned XIDs",
+    "source relation predicate locks, including empty and unmatched range reads",
+    "write skew aborts one transaction with 40001 for custom and mixed native/custom reads",
+    "empty-table and range-insertion phantoms abort one transaction with 40001",
+    "read-time 40001 unwinds each native heap scan and permits reuse after rollback",
+    "native invariants checked after participant transactions, without masking custom dependencies",
+    "capture, live reuse and checkpoint reuse remain explicitly unsupported under SSI"
+  ],
+  "snapshot_checks": [
+    "repeatable_read",
+    "read_own_writes",
+    "read_committed",
+    "atomic_refresh_rollback",
+    "fresh_heap_read_only_no_xid",
+    "fresh_heap_serializable",
+    "fresh_heap_transaction_lock_retention"
+  ],
+  "grouping_checks": [
+    "nullable keys and values at the caller's snapshot",
+    "repeatable-read visibility across committed key/value changes",
+    "own-write visibility and uncommitted isolation",
+    "read-only grouping without an assigned XID",
+    "source DDL lock retained until transaction end",
+    "serializable fresh grouping matches native SQL",
+    "statement timeout and clean reuse after cancellation"
+  ]
+}
