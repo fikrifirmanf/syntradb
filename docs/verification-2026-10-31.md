@@ -49,7 +49,7 @@ This run is invalid as performance or soak evidence.
 These runs target `7b3609f`:
 
 - [Native Linux checks](https://github.com/fikrifirmanf/syntradb/actions/runs/41133222936): passed.
-- [Two-hour checkpoint soak](https://github.com/fikrifirmanf/syntradb/actions/runs/41133224378): running.
+- [Two-hour checkpoint soak](https://github.com/fikrifirmanf/syntradb/actions/runs/41133224378): failed offered-load limits. Both writers missed about 17.1% of cycles and the repeatable-read worker missed 23.5%, above the 5% ceiling. See the [measured findings](../benchmarks/checkpoint-soak-linux-2026-10-31.md).
 - [Recovery and lifecycle checks](https://github.com/fikrifirmanf/syntradb/actions/runs/41133228732),
   covering 21 cases. See the [workflow contract](../benchmarks/github-actions.md).
 
@@ -64,7 +64,7 @@ matched the primary's expected state and resumed capture and maintenance.
 The original workflow finished with 19 passes and two quorum failures in their
 counter sampling harness, as described below.
 
-No completed two-hour result is claimed here. The earlier laptop run stopped at
+The two-hour run completed its timed windows but failed its service limits. The earlier laptop run stopped at
 minute 103 after sleep and unrelated load disturbed it. Comparing 0.6.0 and 0.7.0
 still requires matched workloads on comparable hardware.
 
@@ -77,7 +77,7 @@ restoring the assertion made that fixture pass. This checks that assertion
 failures propagate through the harness.
 
 [The one-hour Linux run](https://github.com/fikrifirmanf/syntradb/actions/runs/41134171409)
-targets `5d6180c` and is pending. The fuzz driver is built with Rust 1.99.0;
+targeted `5d6180c` and passed 255,717,259 inputs in 3,601 seconds without a reported failure. The fuzz driver is built with Rust 1.99.0;
 nightly is used for sanitizer instrumentation of the target.
 
 ## Bounded grouped aggregates
@@ -123,7 +123,7 @@ with the explicit unittest command.
 A local numeric quorum run preserved all 6,491 acknowledged writes after losing
 the primary and the most advanced standby. Injecting a SQL error into just one
 writer made the whole check fail; that injection was then removed. Corrected
-Linux reruns on commit `c917eea` are pending:
+Linux reruns on commit `c917eea` passed:
 
 - [Numeric quorum](https://github.com/fikrifirmanf/syntradb/actions/runs/41138695372).
 - [Integer quorum](https://github.com/fikrifirmanf/syntradb/actions/runs/41138700085).
@@ -135,3 +135,5 @@ Automatic planner routing, broader analytical operators and types, deployment
 packages, a license decision and a support contract remain unfinished. Long
 fuzzing, broader load tests and failure tests across real machines still need
 evidence. Passing the listed checks cannot establish a complete production database.
+
+The corrected full 21-case verification run is [41168092491](https://github.com/fikrifirmanf/syntradb/actions/runs/41168092491). Its result is pending; the throughput gate remains open regardless of its result.
