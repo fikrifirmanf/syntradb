@@ -71,3 +71,5 @@ re-read and verify stored bytes before pruning. The
 maintenance cost in two probes, with little changed-path gain and variable mixed
 tails. Next, test resource limits and longer retained snapshots. This does not
 change reader replay admission or enable automatic maintenance.
+
+The native Linux two-hour 0.7.0 soak failed its offered-load limits: writers missed about 17.1% of cycles and the repeatable-read worker missed 23.5%. Both recovered after the retained snapshot ended. See the [findings and versioned data](../benchmarks/checkpoint-soak-linux-2026-10-31.md). This leaves the load gate open.
