@@ -974,36 +974,6 @@ pub(super) fn run(cluster: &Cluster, options: &Options) -> Result<Value> {
             ],
         )?
         .try_get(0)?;
-    let soak_report = if soak {
-        let wal_bytes: u64 = wal.parse()?;
-        let service = reports
-            .iter()
-            .filter(|s| {
-                matches!(
-                    s.name,
-                    "writer_0" | "writer_1" | "read_committed" | "repeatable_read"
-                )
-            })
-            .map(|s| crate::checkpoint_soak::Service {
-                name: s.name,
-                scheduled_p99_ms: s.scheduled_latency.report()["p99_ms"]
-                    .as_f64()
-                    .unwrap_or(f64::MAX),
-                planned: s.planned,
-                missed: s.planned.saturating_sub(s.attempts),
-            })
-            .collect::<Vec<_>>();
-        crate::checkpoint_soak::evaluate(&windows, &service, wal_bytes, committed_writes)
-            .inspect_err(|_| {
-                // A failed soak writes no report; keep each worker's latencies,
-                // including writer steps, in the run's output.
-                for report in reports.iter().map(Stats::report) {
-                    eprintln!("Checkpoint soak worker: {report}");
-                }
-            })?
-    } else {
-        Value::Null
-    };
     admin
         .query_one(APPLY, &[])
         .map_err(|e| format!("checkpoint stress final apply: {e}"))?;
@@ -1046,11 +1016,44 @@ pub(super) fn run(cluster: &Cluster, options: &Options) -> Result<Value> {
         footprint(&mut admin).map_err(|e| format!("checkpoint stress vacuumed footprint: {e}"))?;
     admin
         .batch_execute("DROP TABLE checkpoint_stress_source; DROP ROLE checkpoint_stress_reader")?;
+    eprintln!("Checkpoint stress: final apply/prune, keyed comparison, checkpoint reuse and vacuum passed");
+    // Service limits judge the timed windows. They must not skip the independent
+    // quiescent correctness checks above when offered load exceeds capacity.
+    let soak_report = if soak {
+        let wal_bytes: u64 = wal.parse()?;
+        let service = reports
+            .iter()
+            .filter(|s| {
+                matches!(
+                    s.name,
+                    "writer_0" | "writer_1" | "read_committed" | "repeatable_read"
+                )
+            })
+            .map(|s| crate::checkpoint_soak::Service {
+                name: s.name,
+                scheduled_p99_ms: s.scheduled_latency.report()["p99_ms"]
+                    .as_f64()
+                    .unwrap_or(f64::MAX),
+                planned: s.planned,
+                missed: s.planned.saturating_sub(s.attempts),
+            })
+            .collect::<Vec<_>>();
+        crate::checkpoint_soak::evaluate(&windows, &service, wal_bytes, committed_writes)
+            .inspect_err(|_| {
+                // A failed soak writes no report; keep each worker's latencies,
+                // including writer steps, in the run's output.
+                for report in reports.iter().map(Stats::report) {
+                    eprintln!("Checkpoint soak worker: {report}");
+                }
+            })?
+    } else {
+        Value::Null
+    };
     require(
         options.checkpoint_soak_skip.is_empty(),
         "ablated soak is diagnostic only; read the per-window samples, no report is written",
     )?;
     Ok(
-        json!({"duration_seconds":seconds,"soak":soak_report,"elapsed_including_drain_seconds":elapsed,"source_rows":rows,"capture_event_budget":4096,"reader_tail_opt_in":options.checkpoint_reader_replay,"combined_maintenance":options.checkpoint_combined_maintenance,"column_type":match column {CheckpointColumn::Int4=>"int4",CheckpointColumn::Int8=>"int8",CheckpointColumn::Numeric=>"numeric(18,2)"},"offered_cycles_per_worker_second":options.checkpoint_worker_rate,"arrival_policy":"zero rate is saturated; otherwise absolute slots, drop missed slots, no catch-up burst","workers":reports.iter().map(Stats::report).collect::<Vec<_>>(),"retained_snapshot_checks":anchor_stats.checks,"quiescent_keyed_check":true,"quiescent_checkpoint_reuse":true,"unexpected_errors":0,"invariant_failures":0,"before":before,"after":after,"after_drain":drained,"after_vacuum":vacuumed,"wal_bytes":wal,"scope":if soak {"paced correctness soak; independent sessions and vacuum worker; one old snapshot retained until the midpoint; per-window progress, storage, WAL, xmin horizon and backend RSS samples; RSS includes touched shared buffers; WAL excludes final drain/vacuum; no cross-database speed claim"} else {"correctness stress; optional paced per-worker arrivals; independent sessions; successful and rejected cycle service latencies; WAL excludes final drain/vacuum; one old snapshot retained throughout; no RSS quota, disk reclamation or cross-database speed claim"}}),
+        json!({"duration_seconds":seconds,"soak":soak_report,"elapsed_including_drain_seconds":start.elapsed().as_secs_f64(),"source_rows":rows,"capture_event_budget":4096,"reader_tail_opt_in":options.checkpoint_reader_replay,"combined_maintenance":options.checkpoint_combined_maintenance,"column_type":match column {CheckpointColumn::Int4=>"int4",CheckpointColumn::Int8=>"int8",CheckpointColumn::Numeric=>"numeric(18,2)"},"offered_cycles_per_worker_second":options.checkpoint_worker_rate,"arrival_policy":"zero rate is saturated; otherwise absolute slots, drop missed slots, no catch-up burst","workers":reports.iter().map(Stats::report).collect::<Vec<_>>(),"retained_snapshot_checks":anchor_stats.checks,"quiescent_keyed_check":true,"quiescent_checkpoint_reuse":true,"unexpected_errors":0,"invariant_failures":0,"before":before,"after":after,"after_drain":drained,"after_vacuum":vacuumed,"wal_bytes":wal,"scope":if soak {"paced correctness soak; independent sessions and vacuum worker; one old snapshot retained until the midpoint; per-window progress, storage, WAL, xmin horizon and backend RSS samples; RSS includes touched shared buffers; WAL excludes final drain/vacuum; no cross-database speed claim"} else {"correctness stress; optional paced per-worker arrivals; independent sessions; successful and rejected cycle service latencies; WAL excludes final drain/vacuum; one old snapshot retained throughout; no RSS quota, disk reclamation or cross-database speed claim"}}),
     )
 }
