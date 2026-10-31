@@ -40,6 +40,14 @@ checks, including a timestamp-filtered sum. The
 [local evidence](../benchmarks/evidence/temporal-local-2026-11-01.json) records
 the checks, log hashes, package manifest and archive checksum at `205013b`.
 
-Native Linux CI, pilot archive installation and the expanded 30-case lifecycle
-suite remain pending. No performance claim or throughput-gate closure follows
-from these functional checks. The earlier held-snapshot load failure remains open.
+The [native Linux CI run](https://github.com/fikrifirmanf/syntradb/actions/runs/41244497105)
+passed 230 PostgreSQL tests, 18 Python tests and the Rust checks at `205013b`.
+Both staged and extracted pilot archive installation checks passed, including
+the time-filtered sum. The loaded library fingerprint matches the local build.
+The [dependency run](https://github.com/fikrifirmanf/syntradb/actions/runs/41244497112)
+also passed. The [Linux evidence](../benchmarks/evidence/temporal-linux-2026-11-01.json)
+records terminal job steps, log hashes and the producer's archive checksum.
+
+The expanded [30-case lifecycle suite](https://github.com/fikrifirmanf/syntradb/actions/runs/41244510539)
+is still running. No performance claim or throughput-gate closure follows from
+these functional checks. The earlier held-snapshot load failure remains open.

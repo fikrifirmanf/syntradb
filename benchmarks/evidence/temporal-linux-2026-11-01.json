@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "source_commit": "205013b19e34c5570ff35475857e7ced71232867",
+  "ci_run": "https://github.com/fikrifirmanf/syntradb/actions/runs/41244497105",
+  "dependency_run": "https://github.com/fikrifirmanf/syntradb/actions/runs/41244497112",
+  "ci": {
+    "conclusion": "success",
+    "headSha": "205013b19e34c5570ff35475857e7ced71232867",
+    "jobs": [
+      {
+        "completedAt": "2026-10-31T21:51:54Z",
+        "conclusion": "success",
+        "databaseId": 124664994689,
+        "name": "check",
+        "startedAt": "2026-10-31T21:38:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T21:38:03Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T21:38:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:38:04Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-10-31T21:38:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:38:15Z",
+            "conclusion": "success",
+            "name": "Install PostgreSQL build dependencies",
+            "number": 3,
+            "startedAt": "2026-10-31T21:38:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:38:24Z",
+            "conclusion": "success",
+            "name": "Install pinned Rust toolchain",
+            "number": 4,
+            "startedAt": "2026-10-31T21:38:15Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:44:23Z",
+            "conclusion": "success",
+            "name": "Build project-local PostgreSQL and pgrx",
+            "number": 5,
+            "startedAt": "2026-10-31T21:38:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:48:05Z",
+            "conclusion": "success",
+            "name": "Check Rust and PostgreSQL integration",
+            "number": 6,
+            "startedAt": "2026-10-31T21:44:23Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:51:50Z",
+            "conclusion": "success",
+            "name": "Build and verify a pilot installation bundle",
+            "number": 7,
+            "startedAt": "2026-10-31T21:48:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:51:51Z",
+            "conclusion": "success",
+            "name": "Save pilot bundle and installation evidence",
+            "number": 8,
+            "startedAt": "2026-10-31T21:51:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:51:52Z",
+            "conclusion": "success",
+            "name": "Save build and test logs",
+            "number": 9,
+            "startedAt": "2026-10-31T21:51:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:51:52Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 18,
+            "startedAt": "2026-10-31T21:51:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:51:52Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 19,
+            "startedAt": "2026-10-31T21:51:52Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/fikrifirmanf/syntradb/actions/runs/41244497105/job/124664994689"
+      }
+    ]
+  },
+  "dependencies": {
+    "conclusion": "success",
+    "headSha": "205013b19e34c5570ff35475857e7ced71232867",
+    "jobs": [
+      {
+        "completedAt": "2026-10-31T21:41:12Z",
+        "conclusion": "success",
+        "databaseId": 124664994544,
+        "name": "audit",
+        "startedAt": "2026-10-31T21:38:02Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-31T21:38:04Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-31T21:38:03Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:38:05Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 2,
+            "startedAt": "2026-10-31T21:38:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:41:05Z",
+            "conclusion": "success",
+            "name": "Install pinned advisory scanner",
+            "number": 3,
+            "startedAt": "2026-10-31T21:38:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:41:09Z",
+            "conclusion": "success",
+            "name": "Audit workspace and fuzz dependencies",
+            "number": 4,
+            "startedAt": "2026-10-31T21:41:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:41:10Z",
+            "conclusion": "success",
+            "name": "Save advisory reports and database revision",
+            "number": 5,
+            "startedAt": "2026-10-31T21:41:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:41:11Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "number": 10,
+            "startedAt": "2026-10-31T21:41:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-31T21:41:11Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-10-31T21:41:11Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/fikrifirmanf/syntradb/actions/runs/41244497112/job/124664994544"
+      }
+    ]
+  },
+  "test_counts": {
+    "postgresql": 230,
+    "python": 18
+  },
+  "package_summary_from_ci": {
+    "archive": "/home/runner/work/syntradb/syntradb/benchmarks/results/pilot-package/syntradb-0.10.0-pg18-x86_64-unknown-linux-gnu-pilot.tar.gz",
+    "sha256": "b31543e5c465f973ab46f20587040bdc45ef8d4098c21430643f9cabe69258ea",
+    "verification": {
+      "status": "passed",
+      "checks": {
+        "version": "0.10.0",
+        "profile": "release",
+        "fingerprint": "5ee658522cd78b6972d5839d6ba0019d230e8240bbbc3b0ad42dcc803570a9bb",
+        "rows": 2,
+        "sum": 31,
+        "route": "checkpoint",
+        "pending": 0,
+        "time_sum": 31
+      },
+      "fresh_heap_ssi": "2|31",
+      "private_install": true
+    }
+  },
+  "logs_sha256": {
+    "check.log": "117322365223be8deb70d063d2c13867a5e093a13c80b50a1869b57bb9b3fe1b",
+    "package.log": "62e483c7df91389cf03b335dd7febc6aa447927d933654d3cbb634560844e56b"
+  },
+  "limitations": [
+    "The checksum is recorded by the producer. The Linux binary archive was not independently downloaded in this verification.",
+    "The full 30-case lifecycle suite is still running.",
+    "No performance claim or closure of the earlier throughput gate."
+  ]
+}
