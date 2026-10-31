@@ -140,7 +140,7 @@ SELECT json_build_object('version',syntra_version(),'profile',syntra_build_profi
  'pending',(SELECT pending_events FROM syntra_capture_lag('package_source')))
 FROM syntra_checkpoint_int4_summary('package_source','v') AS s;
 BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY;
-SELECT rows,sum FROM syntra_int4_summary('package_source','v');
+SELECT rows,sum FROM syntra_heap_int4_summary('package_source','v');
 COMMIT;
 """
             result = run([binary / 'psql', '-XAtq', '-v', 'ON_ERROR_STOP=1', '-h', socket, '-p', '28969', '-U', 'syntra_package', '-d', 'postgres'], input=sql, capture_output=True, text=True, env=environment, timeout=30, check=False)
