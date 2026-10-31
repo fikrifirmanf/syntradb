@@ -6,7 +6,7 @@ import hashlib
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import platform
 import shutil
 import subprocess
@@ -93,6 +93,26 @@ def archive(directory, destination, epoch):
                 data = path.read_bytes()
                 info.size, info.mtime, info.mode = len(data), epoch, 0o644
                 tar.addfile(info, io.BytesIO(data))
+
+
+def unpack(source, destination):
+    destination.mkdir(parents=True, exist_ok=False)
+    total = 0
+    seen = set()
+    with tarfile.open(source, mode='r:gz') as tar:
+        for member in tar:
+            path = PurePosixPath(member.name)
+            total += member.size
+            if (not member.isfile() or path.is_absolute() or '..' in path.parts
+                    or not path.parts or member.name in seen or len(seen) >= 2048
+                    or total > 512 * 1024 * 1024):
+                raise ValueError('archive contains unsafe, duplicate or oversized payloads')
+            seen.add(member.name)
+            target = destination.joinpath(*path.parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with tar.extractfile(member) as payload, target.open('xb') as out:
+                shutil.copyfileobj(payload, out)
+            target.chmod(0o644)
 
 
 def config(pg_config, flag):
@@ -210,7 +230,15 @@ def build(pg_config, destination):
     (bundle / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     target = next(line.removeprefix('host: ') for line in rust.splitlines() if line.startswith('host: '))
     tar = destination / f'syntradb-{version}-pg18-{target}-pilot.tar.gz'
-    archive(bundle, tar, epoch)
+    candidate = destination / 'candidate.tar.gz'
+    archive(bundle, candidate, epoch)
+    extracted = destination / 'extracted'
+    unpack(candidate, extracted)
+    validate_files(extracted, file_manifest(bundle))
+    archive_verification = verify(extracted, pg_config, destination / 'archive-verification', version, expected_fingerprint)
+    if archive_verification != verification:
+        raise ValueError('archive installation does not match the staged bundle verification')
+    candidate.rename(tar)
     (destination / 'SHA256SUMS').write_text(f'{sha(tar)}  {tar.name}\n')
     print(json.dumps({'archive': str(tar), 'sha256': sha(tar), 'verification': verification}))
 

@@ -42,11 +42,13 @@ It starts a disposable cluster using a private Unix socket. It then checks:
 - a fresh heap read in a serializable transaction.
 
 Every check must pass before the final archive and SHA256SUMS file are written.
+The verifier also unpacks a candidate archive, checks its exact file bytes, and
+repeats installation from those extracted files before naming the final archive.
 The cluster stops on both success and failure. Build and SQL logs remain beside
 the bundle. A failed build never produces a verified final archive.
 
-Five offline tests cover platform library names, payload tampering, missing and
-extra files, symlink rejection, stable archives and the source-fingerprint format. Disabling the
+Six offline tests cover platform library names, payload tampering, missing and
+extra files, unsafe archives, stable archives and the source-fingerprint format. Disabling the
 manifest comparison made the tampering test fail; the comparison was restored.
 Native installation checks provide separate evidence beyond these offline tests.
 

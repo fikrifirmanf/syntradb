@@ -63,6 +63,25 @@ class PackagePilotTests(unittest.TestCase):
             self.assertEqual(tar.getnames(), ['LICENSE', 'lib/syntradb.so'])
             self.assertEqual(tar.extractfile('lib/syntradb.so').read(), b'fixture-library')
             self.assertEqual([(m.uid, m.gid, m.mtime, m.mode) for m in tar.getmembers()], [(0, 0, 123, 0o644)] * 2)
+        extracted = self.root / 'extracted'
+        package.unpack(first, extracted)
+        self.assertEqual((extracted / 'lib/syntradb.so').read_bytes(), b'fixture-library')
+
+    def test_unpack_rejects_traversal_links_and_duplicate_files(self):
+        for name, symlink, duplicate in [('../outside', False, False), ('/absolute', False, False),
+                                          ('link', True, False), ('data', False, True)]:
+            with self.subTest(name=name):
+                source = self.root / 'unsafe.tar.gz'
+                with tarfile.open(source, 'w:gz') as tar:
+                    member = tarfile.TarInfo(name)
+                    if symlink:
+                        member.type, member.linkname = tarfile.SYMTYPE, '/outside'
+                    tar.addfile(member)
+                    if duplicate:
+                        tar.addfile(member)
+                with tempfile.TemporaryDirectory(dir=self.root) as target:
+                    with self.assertRaisesRegex(ValueError, 'unsafe, duplicate or oversized'):
+                        package.unpack(source, Path(target) / 'unpacked')
 
     def test_source_fingerprint_matches_the_v1_wire_fixture_and_rejects_symlinks(self):
         (self.root / '.cargo').mkdir()

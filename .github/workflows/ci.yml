@@ -53,7 +53,7 @@ jobs:
         with:
           name: pilot-package-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            benchmarks/results/pilot-package/*.tar.gz
+            benchmarks/results/pilot-package/syntradb-*-pilot.tar.gz
             benchmarks/results/pilot-package/SHA256SUMS
             benchmarks/results/pilot-package/bundle/manifest.json
             benchmarks/results/pilot-package/bundle/verification.json
@@ -61,6 +61,9 @@ jobs:
             benchmarks/results/pilot-package/verification/*.log
             benchmarks/results/pilot-package/verification/*.stdout
             benchmarks/results/pilot-package/verification/*.stderr
+            benchmarks/results/pilot-package/archive-verification/*.log
+            benchmarks/results/pilot-package/archive-verification/*.stdout
+            benchmarks/results/pilot-package/archive-verification/*.stderr
           if-no-files-found: warn
           retention-days: 7
       - name: Save build and test logs
