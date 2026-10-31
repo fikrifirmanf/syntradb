@@ -36,7 +36,7 @@ under the same conditions.
 ## Recovery and lifecycle verification
 
 Start **Actions → Recovery and lifecycle verification → Run workflow** to run
-21 independent checks on Ubuntu 24.04 x86_64. Four jobs run at a time. A failed
+24 independent checks on Ubuntu 24.04 x86_64. Four jobs run at a time. A failed
 job does not cancel the other checks.
 
 Leave the check input at `all` for the full suite. To repeat one case, enter its
@@ -54,8 +54,10 @@ gh workflow run readiness.yml --ref main -f check=quorum-numeric
 - Standby reads and promotion for those four layouts.
 - Synchronous cascading replication, rewind and quorum failover for `int4`
   and `numeric`.
-- Upgrades from each archived release, 0.1.0 through 0.6.0, to the current release.
-- Downgrade from 0.7.0 to 0.6.0 and update back to 0.7.0.
+- Upgrades from each archived release, 0.1.0 through 0.7.0, to the current release.
+- Upgrade from 0.7.0 while captured writes and maintenance run.
+- Downgrade to 0.6.0 and update back to the current release.
+- Downgrade from 0.8.0 to 0.7.0 with dependency refusal and library swaps.
 
 Each job builds from source. Its artifact retains the environment, setup and
 check logs, plus server logs and catalog comparisons smaller than 10 MiB each.

@@ -45,6 +45,7 @@ pub(crate) use with_layout;
 mod capture;
 mod checkpoint;
 mod ddl;
+mod grouping;
 mod live;
 mod maintenance;
 mod native_catalog;
@@ -133,6 +134,7 @@ mod tests {
     include!("tracking_tests.rs");
     include!("ddl_tests.rs");
     include!("heap_tests.rs");
+    include!("grouping_tests.rs");
     include!("live_tests.rs");
     include!("capture_tests.rs");
     include!("checkpoint_tests.rs");

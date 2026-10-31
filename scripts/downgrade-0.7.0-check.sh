@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Downgrade a live database from the workspace release (0.7.0) to 0.6.0 and back.
+# Downgrade a live database from the workspace release to 0.6.0 and back.
 # 0.7.0 appends each partition delta as a row of capture_chunk_deltas; 0.6.0
 # reads it inline from the chunk row, so the downgrade moves each partition's
 # newest delta back. An apply that holds the maintenance lock when the downgrade
 # starts must make it wait. Checks that reads match the heap after each step,
 # that pending history applies on 0.6.0, the catalog against fresh 0.6.0 and
-# 0.7.0 installs, and that deltas are appended again after a second update.
+# current installs, and that deltas are appended again after a second update.
+# On 0.8.0, the first step also removes the additive grouping function.
 # Builds into a private copy of the production PostgreSQL install; the original
 # is untouched.
 set -euo pipefail
@@ -16,8 +17,8 @@ export PGRX_HOME="$SYNTRA_ROOT/.pgrx"
 export PATH="$SYNTRA_ROOT/.tools/bin:$PATH"
 OLD=0.6.0
 CURRENT="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
-if [[ "$CURRENT" != 0.7.0 ]]; then
-    echo "downgrade check failed: this check covers 0.7.0 to 0.6.0, workspace is '$CURRENT'" >&2
+if [[ "$CURRENT" != 0.7.0 && "$CURRENT" != 0.8.0 ]]; then
+    echo "downgrade check failed: this check covers 0.7.0 or 0.8.0 to 0.6.0, workspace is '$CURRENT'" >&2
     exit 1
 fi
 WORK="$SYNTRA_ROOT/target/downgrade-0.7.0-check/$(date +%Y%m%d-%H%M%S)-$$"
@@ -55,26 +56,7 @@ READ="SELECT s.route||':'||(ROW(s.rows,s.non_nulls,s.sum,s.min,s.max) IS NOT DIS
 DELTAS="SELECT (SELECT count(*) FROM syntra.capture_chunks WHERE delta IS NOT NULL)||':'
     ||(SELECT count(*) FROM pg_class WHERE oid=to_regclass('syntra.capture_chunk_deltas'))"
 APPENDED="SELECT count(*) FROM syntra.capture_chunk_deltas"
-FINGERPRINT="SELECT f FROM (
-    SELECT 'rel '||c.relname||' '||c.relkind::text||' '||coalesce(c.relacl::text,'-') AS f
-        FROM pg_class AS c WHERE c.relnamespace='syntra'::regnamespace
-    UNION ALL SELECT 'col '||c.relname||'.'||a.attname||' '||a.attnum||' '||format_type(a.atttypid,a.atttypmod)
-        ||' '||a.attnotnull::text||' '||a.attidentity::text||' '||coalesce(pg_get_expr(d.adbin,d.adrelid),'-')
-        FROM pg_attribute AS a JOIN pg_class AS c ON c.oid=a.attrelid
-        LEFT JOIN pg_attrdef AS d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
-        WHERE c.relnamespace='syntra'::regnamespace AND c.relkind='r' AND a.attnum>0 AND NOT a.attisdropped
-    UNION ALL SELECT 'con '||conrelid::regclass::text||' '||conname||' '||pg_get_constraintdef(oid)
-        FROM pg_constraint WHERE connamespace='syntra'::regnamespace
-    UNION ALL SELECT 'idx '||pg_get_indexdef(i.indexrelid)
-        FROM pg_index AS i JOIN pg_class AS c ON c.oid=i.indrelid WHERE c.relnamespace='syntra'::regnamespace
-    UNION ALL SELECT 'fn '||p.oid::regprocedure::text||' '||pg_get_function_result(p.oid)||' '||p.provolatile::text
-        ||p.proparallel::text||p.prosecdef::text||p.proisstrict::text||' '||coalesce(p.proacl::text,'-')||' '||p.prosrc
-        FROM pg_proc AS p JOIN pg_depend AS d ON d.classid='pg_proc'::regclass AND d.objid=p.oid AND d.deptype='e'
-        JOIN pg_extension AS e ON e.oid=d.refobjid AND e.extname='syntradb'
-    UNION ALL SELECT 'evt '||evtname||' '||evtevent||' '||evtenabled::text||' '||evtfoid::regproc::text FROM pg_event_trigger
-    UNION ALL SELECT 'member '||pg_describe_object(classid,objid,objsubid)
-        FROM pg_depend WHERE deptype='e' AND refobjid=(SELECT oid FROM pg_extension WHERE extname='syntradb')
-) AS q ORDER BY 1"
+FINGERPRINT="$(cat scripts/lib/catalog-fingerprint.sql)"
 
 install_old
 start
@@ -150,7 +132,7 @@ stop
 
 install_current
 start
-# unslop-ignore NO_SQL_INTERPOLATION -- CURRENT is checked to be 0.7.0 above; ALTER EXTENSION takes no bind parameters.
+# unslop-ignore NO_SQL_INTERPOLATION -- CURRENT is checked against supported versions above; ALTER EXTENSION takes no bind parameters.
 q downgraded "ALTER EXTENSION syntradb UPDATE TO '$CURRENT'"
 q fresh_current "CREATE EXTENSION syntradb"
 q downgraded "$FINGERPRINT" >"$WORK/upgraded.catalog"

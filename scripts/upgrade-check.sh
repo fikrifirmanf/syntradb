@@ -88,7 +88,16 @@ stop
 
 install_from "$SYNTRA_ROOT" "$SYNTRA_ROOT/target/upgrade-current"
 start
-if [[ "$FROM" == 0.6.0 ]]; then
+if [[ "$FROM" == 0.7.0 ]]; then
+    # 0.8.0 adds the explicit grouping function without changing capture storage.
+    q upgraded "UPDATE feed SET v=0 WHERE id=1"
+    BEFORE_EVENTS=1
+    # unslop-ignore NO_SQL_INTERPOLATION -- READ is the constant query defined above.
+    expect "read before the update" "$(q upgraded "$READ")" "replay:true"
+    # unslop-ignore NO_SQL_INTERPOLATION -- LIVE is the constant query defined above.
+    expect "trusted read before the update" "$(q upgraded "$LIVE")" "heap:version_changed:true"
+    expect "grouping absent before the update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_group_integer_summary(regclass,text,text,integer)') IS NULL")" "t"
+elif [[ "$FROM" == 0.6.0 ]]; then
     # 0.7.0 adds only the delta table. Writes are captured and reads replay the
     # inline deltas 0.6.0 stored; an apply that would append a delta fails and
     # publishes nothing until the update creates the table.
@@ -175,7 +184,7 @@ case "$FROM:$DURING" in
     expect "write during the update rolled back" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "60"
     DURING_EVENTS=0
     ;;
-0.6.0:captured)
+0.6.0:captured | 0.7.0:captured)
     if [ "$WAITED" -ge 1000 ]; then
         echo "upgrade check failed: a capture write waited ${WAITED} ms for the update" >&2
         exit 1
@@ -254,26 +263,7 @@ q upgraded "SELECT applied FROM syntra_apply_prune_capture('wide')" >/dev/null
 expect "int8 checkpoint read" "$(q upgraded "SELECT route||':'||sum FROM syntra_checkpoint_int8_summary('wide','v')")" "checkpoint:17999999999999999999"
 
 q fresh "CREATE EXTENSION syntradb"
-FINGERPRINT="SELECT f FROM (
-    SELECT 'rel '||c.relname||' '||c.relkind::text||' '||coalesce(c.relacl::text,'-') AS f
-        FROM pg_class AS c WHERE c.relnamespace='syntra'::regnamespace
-    UNION ALL SELECT 'col '||c.relname||'.'||a.attname||' '||a.attnum||' '||format_type(a.atttypid,a.atttypmod)
-        ||' '||a.attnotnull::text||' '||a.attidentity::text||' '||coalesce(pg_get_expr(d.adbin,d.adrelid),'-')
-        FROM pg_attribute AS a JOIN pg_class AS c ON c.oid=a.attrelid
-        LEFT JOIN pg_attrdef AS d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
-        WHERE c.relnamespace='syntra'::regnamespace AND c.relkind='r' AND a.attnum>0 AND NOT a.attisdropped
-    UNION ALL SELECT 'con '||conrelid::regclass::text||' '||conname||' '||pg_get_constraintdef(oid)
-        FROM pg_constraint WHERE connamespace='syntra'::regnamespace
-    UNION ALL SELECT 'idx '||pg_get_indexdef(i.indexrelid)
-        FROM pg_index AS i JOIN pg_class AS c ON c.oid=i.indrelid WHERE c.relnamespace='syntra'::regnamespace
-    UNION ALL SELECT 'fn '||p.oid::regprocedure::text||' '||pg_get_function_result(p.oid)||' '||p.provolatile::text
-        ||p.proparallel::text||p.prosecdef::text||p.proisstrict::text||' '||coalesce(p.proacl::text,'-')||' '||p.prosrc
-        FROM pg_proc AS p JOIN pg_depend AS d ON d.classid='pg_proc'::regclass AND d.objid=p.oid AND d.deptype='e'
-        JOIN pg_extension AS e ON e.oid=d.refobjid AND e.extname='syntradb'
-    UNION ALL SELECT 'evt '||evtname||' '||evtevent||' '||evtenabled::text||' '||evtfoid::regproc::text FROM pg_event_trigger
-    UNION ALL SELECT 'member '||pg_describe_object(classid,objid,objsubid)
-        FROM pg_depend WHERE deptype='e' AND refobjid=(SELECT oid FROM pg_extension WHERE extname='syntradb')
-) AS q ORDER BY 1"
+FINGERPRINT="$(cat scripts/lib/catalog-fingerprint.sql)"
 q upgraded "$FINGERPRINT" >"$WORK/upgraded.catalog"
 q fresh "$FINGERPRINT" >"$WORK/fresh.catalog"
 if ! diff -u "$WORK/fresh.catalog" "$WORK/upgraded.catalog" >"$WORK/catalog.diff"; then

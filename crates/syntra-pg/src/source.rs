@@ -132,6 +132,72 @@ impl<V> Drop for SourceScan<'_, V> {
     }
 }
 
+/// Read both fields from the same MVCC-visible tuple. The value scan owns the
+/// slot and scan; copying the integer key retains no PostgreSQL tuple pointer.
+struct SourcePairs<'a, K, V> {
+    values: SourceScan<'a, V>,
+    key: i16,
+    _key: PhantomData<K>,
+}
+
+impl<K: FromDatum, V: FromDatum> Iterator for SourcePairs<'_, K, V> {
+    type Item = (Option<K>, Option<V>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let value = self.values.next()?;
+        // SAFETY: validation checked both integer attribute types under the
+        // relation lock. SourceScan just filled this live slot, and FromDatum
+        // copies the by-value key before the next tuple can replace the slot.
+        let key = unsafe {
+            let mut is_null = false;
+            let datum = pg_sys::slot_getattr(self.values.slot, i32::from(self.key), &mut is_null);
+            K::from_datum(datum, is_null)
+        };
+        Some((key, value))
+    }
+}
+
+pub(super) fn group_integer(
+    source: &PgRelation,
+    key: &str,
+    value: &str,
+    max_groups: usize,
+) -> Result<Vec<syntra_exec::GroupedInt8Summary>, syntra_exec::GroupingError> {
+    let types = &[pg_sys::INT2OID, pg_sys::INT4OID, pg_sys::INT8OID];
+    let message = "heap grouping requires stored, non-generated int2, int4 or int8 columns";
+    let (key, key_type) = validate_column(source, key, types, message);
+    let (value, value_type) = validate_column(source, value, types, message);
+    let snapshot = source_snapshot();
+    crate::with_layout!(
+        width(key_type),
+        width(value_type),
+        unsupported(message),
+        group_integer_checked(source, key, value, snapshot, max_groups)
+    )
+}
+
+fn group_integer_checked<K: crate::Column, V: crate::Column>(
+    source: &PgRelation,
+    key: i16,
+    value: i16,
+    snapshot: pg_sys::Snapshot,
+    max_groups: usize,
+) -> Result<Vec<syntra_exec::GroupedInt8Summary>, syntra_exec::GroupingError> {
+    let rows = SourcePairs::<K, V> {
+        values: SourceScan::new(source, value, snapshot),
+        key,
+        _key: PhantomData,
+    };
+    syntra_exec::group_int8(
+        rows.map(|(key, value)| (key.map(Into::into), value.map(Into::into))),
+        max_groups,
+        || {
+            pgrx::check_for_interrupts!();
+            true
+        },
+    )
+}
+
 struct Provenance {
     database: pg_sys::Oid,
     snapshot: String,

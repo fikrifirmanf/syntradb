@@ -374,6 +374,30 @@ open, then checks that:
 - the catalog matches a fresh 0.6.0 install, and after a second update a fresh
   0.7.0 install, and applies append deltas again.
 
+## 0.7.0 to 0.8.0
+
+0.8.0 adds the explicit [fresh integer grouping API](heap-grouped-aggregates.md).
+The update creates one SQL function. It preserves capture catalogs, pending
+events and checkpoint bytes. Install the new library, restart sessions that
+loaded the old library, then update each database. Capture writes, reads and
+maintenance keep working before the SQL update. Grouping becomes available
+after it commits.
+
+## 0.8.0 to 0.7.0 (downgrade)
+
+With the 0.8.0 library still installed, run
+`ALTER EXTENSION syntradb UPDATE TO '0.7.0'`. This removes the grouping function.
+Dependent user views block the entire downgrade. Remove those dependencies
+explicitly before retrying. Then install the 0.7.0 library and restart sessions
+that loaded 0.8.0. Capture storage is unchanged and continues across both steps.
+
+`scripts/downgrade-0.8.0-check.sh` checks refusal with a dependent view, pending
+capture replay, writes with each library, checkpoint reuse, a second upgrade,
+and catalog parity with fresh installs of both releases.
+
+The 0.7.0 source archive comes from commit `d23f65b`. Its SHA-256 is
+`3b737c3f519c20df6012e2c1dac21739c13825418089cd560ee7c5cd6ebf7dc3`.
+
 ## Upgrade check
 
 ```sh
@@ -383,6 +407,7 @@ bash scripts/upgrade-check.sh 0.3.0    # from 0.3.0
 bash scripts/upgrade-check.sh 0.4.0    # from 0.4.0
 bash scripts/upgrade-check.sh 0.5.0    # from 0.5.0
 bash scripts/upgrade-check.sh 0.6.0    # from 0.6.0
+bash scripts/upgrade-check.sh 0.7.0    # from 0.7.0
 ```
 
 The check builds the archived source
@@ -399,7 +424,7 @@ swaps in the new library and checks that:
   the update, which holds each captured source's lock to commit while it
   replaces the row trigger, and is then captured; from 0.1.0 it may instead fail
   closed; from 0.6.0, where the update replaces no trigger, it is captured in
-  under a second;
+  under a second; from 0.7.0 the additive grouping update also permits the write;
 - from 0.6.0, an apply before the update fails and publishes nothing, and after
   the drain the replaced deltas have rows of their own;
 - from 0.5.0, a feed whose row trigger was disabled keeps the disabled trigger

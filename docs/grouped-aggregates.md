@@ -5,7 +5,8 @@ into grouped COUNT, SUM, MIN and MAX summaries. They retain group state rather
 than input rows. The `int8` path keeps sums in `i128`, including results beyond
 the `bigint` range, matching PostgreSQL's `sum(bigint)` numeric results.
 The SQL planner uses PostgreSQL's existing GROUP BY implementation. This Rust
-entry point will support a later analytical route.
+entry point also backs the explicit [fresh SQL grouping API](heap-grouped-aggregates.md)
+in 0.8.0.
 
 ```rust
 use syntra_exec::group_int4;
@@ -67,5 +68,5 @@ Regenerate the result against a disposable PostgreSQL 18.6 database with
 Allowing one extra group deliberately made the early-termination regression fail.
 Restoring the limit check made it pass. These checks establish the stated kernel
 semantics. Deliberately narrowing wide values to `int4` also failed the wide oracle
-check. SQL grouping acceleration, range grouping, multiple columns and spill
-to disk remain future work.
+check. The SQL API has separate snapshot and permission tests. Planner routing,
+range grouping, multiple columns and spill to disk remain future work.
