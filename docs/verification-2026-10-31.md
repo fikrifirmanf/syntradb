@@ -136,4 +136,4 @@ packages, a license decision and a support contract remain unfinished. Long
 fuzzing, broader load tests and failure tests across real machines still need
 evidence. Passing the listed checks cannot establish a complete production database.
 
-The corrected full 21-case verification run is [41168092491](https://github.com/fikrifirmanf/syntradb/actions/runs/41168092491). Its result is pending; the throughput gate remains open regardless of its result.
+The corrected full 21-case verification run is [41168092491](https://github.com/fikrifirmanf/syntradb/actions/runs/41168092491). All 21 verification cases passed on commit `d23f65b`, along with the planning job. The [versioned job record](../benchmarks/evidence/recovery-linux-070-2026-10-31.json) preserves the job names, steps and conclusions. The throughput gate remains open despite this correctness result.
