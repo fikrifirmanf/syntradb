@@ -88,15 +88,20 @@ stop
 
 install_from "$SYNTRA_ROOT" "$SYNTRA_ROOT/target/upgrade-current"
 start
-if [[ "$FROM" == 0.7.0 ]]; then
-    # 0.8.0 adds the explicit grouping function without changing capture storage.
+if [[ "$FROM" == 0.7.0 || "$FROM" == 0.8.0 ]]; then
+    # 0.8.0 adds grouping; 0.9.0 changes native fresh SSI behavior only. Neither
+    # release changes capture storage or blocks writers during the SQL update.
     q upgraded "UPDATE feed SET v=0 WHERE id=1"
     BEFORE_EVENTS=1
     # unslop-ignore NO_SQL_INTERPOLATION -- READ is the constant query defined above.
     expect "read before the update" "$(q upgraded "$READ")" "replay:true"
     # unslop-ignore NO_SQL_INTERPOLATION -- LIVE is the constant query defined above.
     expect "trusted read before the update" "$(q upgraded "$LIVE")" "heap:version_changed:true"
-    expect "grouping absent before the update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_group_integer_summary(regclass,text,text,integer)') IS NULL")" "t"
+    if [[ "$FROM" == 0.7.0 ]]; then
+        expect "grouping absent before the update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_group_integer_summary(regclass,text,text,integer)') IS NULL")" "t"
+    else
+        expect "grouping preserved before the update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_group_integer_summary(regclass,text,text,integer)') IS NOT NULL")" "t"
+    fi
 elif [[ "$FROM" == 0.6.0 ]]; then
     # 0.7.0 adds only the delta table. Writes are captured and reads replay the
     # inline deltas 0.6.0 stored; an apply that would append a delta fails and
@@ -184,7 +189,7 @@ case "$FROM:$DURING" in
     expect "write during the update rolled back" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "60"
     DURING_EVENTS=0
     ;;
-0.6.0:captured | 0.7.0:captured)
+0.6.0:captured | 0.7.0:captured | 0.8.0:captured)
     if [ "$WAITED" -ge 1000 ]; then
         echo "upgrade check failed: a capture write waited ${WAITED} ms for the update" >&2
         exit 1

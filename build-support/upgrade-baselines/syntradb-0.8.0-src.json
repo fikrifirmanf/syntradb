@@ -1,0 +1,18 @@
+{
+  "source_commit": "28145d0f3e82366b31503ac291572f72d77819c2",
+  "source_version": "0.8.0",
+  "archive_sha256": "a36943d0515f662a759e68c39ce161eb166a4031fcd8be348b4155825778a63f",
+  "packaging": "git archive tar; omit only nested baseline .tgz files; deterministic tar/gzip with gzip mtime zero",
+  "excluded_nested_archives": [
+    "build-support/upgrade-baselines/syntradb-0.1.0-src.tgz",
+    "build-support/upgrade-baselines/syntradb-0.2.0-src.tgz",
+    "build-support/upgrade-baselines/syntradb-0.3.0-src.tgz",
+    "build-support/upgrade-baselines/syntradb-0.4.0-src.tgz",
+    "build-support/upgrade-baselines/syntradb-0.5.0-src.tgz",
+    "build-support/upgrade-baselines/syntradb-0.6.0-src.tgz",
+    "build-support/upgrade-baselines/syntradb-0.7.0-src.tgz"
+  ],
+  "retained_regular_files": 260,
+  "retained_files_verified_identical": true,
+  "expected_source_fingerprint": "d708aff5ce9311f513eb2e0a0d1502801d386555770cfed91e0eefca452ef72f"
+}

@@ -18,6 +18,7 @@ mod grouping_benchmark;
 mod grouping_checks;
 mod mixed;
 mod refresh_costs;
+mod ssi_checks;
 mod tail_checks;
 mod trusted_checks;
 mod trusted_stress;
@@ -361,6 +362,7 @@ fn run(options: &Options) -> Result<Value> {
         &extension_source_fingerprint,
         runner_source_fingerprint,
     )?;
+    let ssi_checks = ssi_checks::run(&cluster)?;
     let snapshot_checks = checks::snapshot_checks(&cluster, &mut enabled)?;
     let grouping_checks = grouping_checks::run(&cluster)?;
     let mut trusted_checks = trusted_checks::run(&cluster)?;
@@ -536,7 +538,7 @@ fn run(options: &Options) -> Result<Value> {
         "source_fingerprint_schema": 1, "extension_source_fingerprint": extension_source_fingerprint,
         "runner_source_fingerprint": runner_source_fingerprint,
         "runner_profile": if cfg!(debug_assertions) { "debug" } else { "release" },
-        "snapshot_checks": snapshot_checks, "grouping_checks": grouping_checks, "trusted_checks": trusted_checks, "capture_checks": capture_checks, "checkpoint_checks": checkpoint_checks, "tail_checks": tail_checks, "postgresql": server,
+        "snapshot_checks": snapshot_checks, "ssi_checks": ssi_checks, "grouping_checks": grouping_checks, "trusted_checks": trusted_checks, "capture_checks": capture_checks, "checkpoint_checks": checkpoint_checks, "tail_checks": tail_checks, "postgresql": server,
         "postgresql_configure": String::from_utf8_lossy(&configure.stdout).trim(),
         "os": std::env::consts::OS, "architecture": std::env::consts::ARCH,
         "logical_cpus": std::thread::available_parallelism()?.get(), "settings": settings,

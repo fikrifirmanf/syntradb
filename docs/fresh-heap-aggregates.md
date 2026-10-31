@@ -29,8 +29,10 @@ concurrent table rewrite after a function returns but before its transaction end
 Calls require schema USAGE and table SELECT. Column-only grants are insufficient.
 Sources must be ordinary heap tables with a stored int4 column. RLS, partitions,
 inheritance parents, generated columns and other types remain outside the scope.
-Serializable calls return SQLSTATE 0A000 until predicate-lock tests establish that
-scope. Normal PostgreSQL queries remain available for unsupported cases.
+Version 0.9.0 adds [serializable fresh reads](serializable-heap-reads.md), including
+predicate-lock and conflicting-transaction checks. Capture and reused-state APIs
+retain their serializable restriction. Normal PostgreSQL queries remain available
+for unsupported cases.
 
 ## Execution and limits
 

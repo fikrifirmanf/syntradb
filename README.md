@@ -54,6 +54,8 @@ what is and is not bounded, with a snapshot age policy.
 The standalone engine includes a [bounded integer grouping kernel](docs/grouped-aggregates.md),
 with PostgreSQL-generated aggregate fixtures and cancellation checks. Version 0.8.0
 exposes it through an explicit [fresh SQL grouping API](docs/heap-grouped-aggregates.md).
+Version 0.9.0 adds [serializable fresh heap reads](docs/serializable-heap-reads.md),
+with conflict tests and whole-transaction retry semantics.
 
 The toolchain file pins Rust 1.99.0. Cargo's default workspace members exclude the
 PostgreSQL adapter so the engine can be developed without PostgreSQL installed.
@@ -177,9 +179,10 @@ synchronization and recovery rules.
 
 Use the [managed projection API](docs/managed-projections.md) for named snapshots.
 Run `bash scripts/recovery-checks.sh` for [crash and restore checks](docs/recovery.md).
-Run `bash scripts/upgrade-check.sh [0.1.0|0.2.0|0.3.0|0.4.0|0.5.0|0.6.0|0.7.0]` to [upgrade older databases](docs/upgrades.md)
+Run `bash scripts/upgrade-check.sh [0.1.0|0.2.0|0.3.0|0.4.0|0.5.0|0.6.0|0.7.0|0.8.0]` to [upgrade older databases](docs/upgrades.md)
 with captured history and compare them with a fresh install.
-Run `bash scripts/downgrade-0.8.0-check.sh` to [downgrade 0.8.0 to 0.7.0](docs/upgrades.md#080-to-070-downgrade).
+Run `bash scripts/downgrade-0.9.0-check.sh` to [downgrade 0.9.0 to 0.8.0](docs/upgrades.md#090-to-080-downgrade).
+Run `bash scripts/downgrade-0.8.0-check.sh` to [downgrade to 0.7.0](docs/upgrades.md#080-to-070-downgrade).
 Run `bash scripts/downgrade-0.7.0-check.sh` to [downgrade 0.7.0 to 0.6.0](docs/upgrades.md#070-to-060-downgrade),
 `bash scripts/downgrade-0.6.0-check.sh` to [downgrade 0.6.0 to 0.5.0](docs/upgrades.md#060-to-050-downgrade),
 `bash scripts/downgrade-0.5.0-check.sh` to [downgrade 0.5.0 to 0.4.0](docs/upgrades.md#050-to-040-downgrade)

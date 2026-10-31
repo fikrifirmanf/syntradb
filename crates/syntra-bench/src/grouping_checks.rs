@@ -84,20 +84,8 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     )?;
 
     reader.batch_execute("BEGIN ISOLATION LEVEL SERIALIZABLE")?;
-    let unsupported = reader
-        .query(
-            "SELECT group_key FROM syntra_heap_group_integer_summary('group_commands','k','v')",
-            &[],
-        )
-        .err()
-        .ok_or("SQL grouping accepted unsupported serializable isolation")?;
-    require(
-        unsupported
-            .code()
-            .is_some_and(|code| code.code() == "0A000"),
-        "serializable SQL grouping returned the wrong SQLSTATE",
-    )?;
-    reader.batch_execute("ROLLBACK")?;
+    verify(&mut reader)?;
+    reader.batch_execute("COMMIT")?;
 
     reader.batch_execute("CREATE TABLE group_cancel(k int4,v int4); INSERT INTO group_cancel SELECT 1,g FROM generate_series(1,1000000) AS g; SET statement_timeout='1ms'")?;
     let cancelled = reader
@@ -120,7 +108,7 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         "own-write visibility and uncommitted isolation",
         "read-only grouping without an assigned XID",
         "source DDL lock retained until transaction end",
-        "serializable isolation rejected explicitly",
+        "serializable fresh grouping matches native SQL",
         "statement timeout and clean reuse after cancellation",
     ])
 }

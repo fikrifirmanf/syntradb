@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prove that 0.8 grouping can be removed without changing captured data or the
-# 0.7 catalog, then added back with a catalog equal to a fresh 0.8 install.
+# 0.7 catalog, then added back with a catalog equal to a fresh workspace install.
 set -euo pipefail
 SYNTRA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SYNTRA_ROOT"
@@ -8,7 +8,7 @@ bash scripts/setup-production.sh
 export PGRX_HOME="$SYNTRA_ROOT/.pgrx"
 export PATH="$SYNTRA_ROOT/.tools/bin:$PATH"
 CURRENT="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
-[[ "$CURRENT" == 0.8.0 ]] || { echo "downgrade check requires workspace 0.8.0" >&2; exit 2; }
+[[ "$CURRENT" == 0.8.0 || "$CURRENT" == 0.9.0 ]] || { echo "downgrade check requires workspace 0.8.0 or 0.9.0" >&2; exit 2; }
 WORK="$SYNTRA_ROOT/target/downgrade-0.8.0-check/$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -p "$WORK/base"
 tar xzf build-support/upgrade-baselines/syntradb-0.7.0-src.tgz -C "$WORK/base"
@@ -56,7 +56,8 @@ if q downgraded "ALTER EXTENSION syntradb UPDATE TO '0.7.0'" >/dev/null 2>"$WORK
     echo "downgrade check failed: a dependent user view was removed or ignored" >&2
     exit 1
 fi
-expect "failed downgrade is atomic" "$(q downgraded "SELECT extversion FROM pg_extension WHERE extname='syntradb'")" "0.8.0"
+# unslop-ignore NO_SQL_INTERPOLATION -- CURRENT is only the expected result, not part of the constant SQL.
+expect "failed downgrade is atomic" "$(q downgraded "SELECT extversion FROM pg_extension WHERE extname='syntradb'")" "$CURRENT"
 expect "dependent view remains readable" "$(q downgraded "SELECT count(*)>0 FROM user_grouping")" "t"
 q downgraded "DROP VIEW user_grouping; ALTER EXTENSION syntradb UPDATE TO '0.7.0'"
 expect "grouping removed" "$(q downgraded "SELECT to_regprocedure('public.syntra_heap_group_integer_summary(regclass,text,text,integer)') IS NULL")" "t"
@@ -78,7 +79,8 @@ stop
 
 install_current
 start
-q downgraded "ALTER EXTENSION syntradb UPDATE TO '0.8.0'"
+# unslop-ignore NO_SQL_INTERPOLATION -- CURRENT is checked against supported literal versions above; ALTER EXTENSION cannot bind its version.
+q downgraded "ALTER EXTENSION syntradb UPDATE TO '$CURRENT'"
 q postgres "CREATE DATABASE fresh_current"
 q fresh_current "CREATE EXTENSION syntradb"
 expect "grouping restored" "$(q downgraded "$GROUP_READ")" "t"
@@ -89,4 +91,4 @@ expect "grouping after second upgrade" "$(q downgraded "$GROUP_READ")" "t"
 q downgraded "$FINGERPRINT" >"$WORK/upgraded.catalog"
 q fresh_current "$FINGERPRINT" >"$WORK/fresh_current.catalog"
 diff -u "$WORK/fresh_current.catalog" "$WORK/upgraded.catalog" >"$WORK/current.diff" || { cat "$WORK/current.diff"; exit 1; }
-echo "downgrade check passed: 0.8.0 -> 0.7.0 -> 0.8.0; dependent views block downgrade atomically, catalogs equal fresh installs, capture remains exact with both libraries, grouping returns after upgrade; work dir $WORK"
+echo "downgrade check passed: $CURRENT -> 0.7.0 -> $CURRENT; dependent views block downgrade atomically, catalogs equal fresh installs, capture remains exact with both libraries, grouping returns after upgrade; work dir $WORK"

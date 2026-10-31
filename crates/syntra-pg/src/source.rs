@@ -167,7 +167,7 @@ pub(super) fn group_integer(
     let message = "heap grouping requires stored, non-generated int2, int4 or int8 columns";
     let (key, key_type) = validate_column(source, key, types, message);
     let (value, value_type) = validate_column(source, value, types, message);
-    let snapshot = source_snapshot();
+    let snapshot = heap_snapshot();
     crate::with_layout!(
         width(key_type),
         width(value_type),
@@ -207,7 +207,10 @@ struct Provenance {
     active_snapshot: pg_sys::Snapshot,
 }
 
-pub(super) fn source_snapshot() -> pg_sys::Snapshot {
+// Fresh scans use table_beginscan's SO_TYPE_SEQSCAN contract: heap_beginscan
+// acquires the relation predicate lock, and the native visibility scan checks
+// outgoing SSI conflicts. Cached/capture paths must use source_snapshot below.
+fn heap_snapshot() -> pg_sys::Snapshot {
     // SAFETY: backend main thread, called while the SQL function is executing.
     // The active snapshot stays owned by PostgreSQL throughout the native scan.
     unsafe {
@@ -215,11 +218,18 @@ pub(super) fn source_snapshot() -> pg_sys::Snapshot {
         if snapshot.is_null() || (*snapshot).snapshot_type != pg_sys::SnapshotType::SNAPSHOT_MVCC {
             unsupported("source capture requires an active MVCC snapshot");
         }
-        if pg_sys::XactIsoLevel == pg_sys::XACT_SERIALIZABLE as i32 {
-            unsupported("serializable source capture is not supported yet");
-        }
         snapshot
     }
+}
+
+pub(super) fn source_snapshot() -> pg_sys::Snapshot {
+    let snapshot = heap_snapshot();
+    // SAFETY: backend-thread transaction state. Reused state has no separate
+    // proof that it supplies the source relation's SSI read dependencies.
+    if unsafe { pg_sys::XactIsoLevel == pg_sys::XACT_SERIALIZABLE as i32 } {
+        unsupported("serializable source capture is not supported yet");
+    }
+    snapshot
 }
 
 /// Bounded keyed seed scan. Caller owns the source's exclusive transaction lock
@@ -512,7 +522,7 @@ fn heap_summary(
     predicate: syntra_exec::Int4Predicate,
 ) -> SummaryRow {
     let attribute = validate_source(source, column);
-    heap_summary_checked(source, attribute, source_snapshot(), predicate)
+    heap_summary_checked(source, attribute, heap_snapshot(), predicate)
 }
 
 pub(super) fn heap_summary_checked(

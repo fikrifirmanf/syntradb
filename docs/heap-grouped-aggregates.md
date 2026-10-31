@@ -57,8 +57,10 @@ The key and value come from the same visible tuple. Repeatable read retains its
 snapshot across other sessions' commits. Read committed sees subsequent committed
 changes at the next statement. Prior writes in the caller's transaction are visible;
 a data-modifying CTE retains the statement snapshot, matching native SQL.
-Read-only calls do not assign a transaction ID. Serializable isolation is rejected
-with `0A000`, as in the existing fresh heap functions.
+Read-only calls do not assign a transaction ID. Version 0.9.0 adds
+[serializable fresh grouping](serializable-heap-reads.md) through PostgreSQL's
+native predicate locks and conflict checks. Capture and cached reads retain
+their separate `0A000` restriction.
 
 Source AccessShareLock references are retained until transaction end to protect
 the checked column types and heap from DDL. Long transactions can therefore hold

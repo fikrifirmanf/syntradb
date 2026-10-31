@@ -1,6 +1,6 @@
 # Serializable fresh heap reads
 
-Fresh heap summaries and integer grouping currently reject serializable
+Before 0.9.0, fresh heap summaries and integer grouping rejected serializable
 transactions with SQLSTATE `0A000`. Removing that restriction requires proof
 that PostgreSQL sees the read dependencies. Snapshot equality alone is
 insufficient: two transactions could otherwise both commit a write-skew cycle.
@@ -62,5 +62,7 @@ must fail with `0A000`. After implementing the split, all acceptance and conflic
 checks must pass. Temporarily bypassing the native scan in a conflict case must
 make the SSI regression fail before restoring the correct implementation.
 
-This is a design and verification plan. Serializable fresh reads are not yet
-implemented, and no support claim follows from source inspection alone.
+The [0.9.0 implementation](serializable-heap-reads.md) follows this split and has
+local conflict and recovery evidence. Native Linux verification remains pending.
+The source inspection alone is not the support evidence, and cached-state SSI
+remains unimplemented.

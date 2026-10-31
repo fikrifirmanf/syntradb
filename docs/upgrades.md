@@ -398,6 +398,40 @@ and catalog parity with fresh installs of both releases.
 The 0.7.0 source archive comes from commit `d23f65b`. Its SHA-256 is
 `3b737c3f519c20df6012e2c1dac21739c13825418089cd560ee7c5cd6ebf7dc3`.
 
+## 0.8.0 to 0.9.0
+
+0.9.0 enables [serializable fresh heap reads](serializable-heap-reads.md).
+The SQL update changes only the extension version marker. Function signatures,
+capture catalogs and stored bytes stay unchanged. Capture writers and maintenance
+continue before and during the update.
+
+Install the new library, restart sessions that loaded the old library, then run
+`ALTER EXTENSION syntradb UPDATE`. Fresh SSI support follows the loaded library,
+including before the catalog update. Capture and cached-state calls remain
+unsupported under serializable isolation. Existing trusted projections fail
+their library-version check and fall back through the established route.
+
+## 0.9.0 to 0.8.0 (downgrade)
+
+With 0.9.0 still installed, run
+`ALTER EXTENSION syntradb UPDATE TO '0.8.0'`. Then install the 0.8.0 library and
+restart sessions. That library restores fresh heap SSI rejection with `0A000`.
+No byte or catalog conversion is needed. Pending capture history remains exact.
+
+`scripts/downgrade-0.9.0-check.sh` swaps both libraries, verifies fresh SSI support
+and its old-library rejection, and compares both catalogs with fresh installs.
+It also replays pending events and captures new writes with each library.
+
+The 0.8.0 baseline comes from commit `28145d0`. Its archive SHA-256 is
+`a36943d0515f662a759e68c39ce161eb166a4031fcd8be348b4155825778a63f`.
+Unlike earlier archives, it omits nested baseline `.tgz` files to avoid recursive
+growth. All 260 retained regular files match that Git tree's bytes and modes.
+Repeated packing produced identical bytes. The old library's source fingerprint
+still matches the verified build, as checked during the downgrade.
+The [provenance record](../build-support/upgrade-baselines/syntradb-0.8.0-src.json)
+lists the exclusions. This archive is a baseline library build input; older
+baseline archives remain separate in the repository.
+
 ## Upgrade check
 
 ```sh
@@ -408,6 +442,7 @@ bash scripts/upgrade-check.sh 0.4.0    # from 0.4.0
 bash scripts/upgrade-check.sh 0.5.0    # from 0.5.0
 bash scripts/upgrade-check.sh 0.6.0    # from 0.6.0
 bash scripts/upgrade-check.sh 0.7.0    # from 0.7.0
+bash scripts/upgrade-check.sh 0.8.0    # from 0.8.0
 ```
 
 The check builds the archived source

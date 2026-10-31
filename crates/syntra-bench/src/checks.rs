@@ -96,20 +96,13 @@ pub(super) fn snapshot_checks(cluster: &Cluster, reader: &mut Client) -> Result<
         .try_get(0)?;
     require(no_xid, "read-only aggregate assigned a transaction ID")?;
     reader.batch_execute("COMMIT; BEGIN ISOLATION LEVEL SERIALIZABLE")?;
-    let rejected = reader
-        .query_one(
-            "SELECT rows FROM syntra_heap_int4_summary('syntra_check_source','balance') LIMIT 1",
-            &[],
-        )
-        .err()
-        .ok_or("serializable fresh scan unexpectedly succeeded")?;
+    let serializable_matches: bool = reader.query_one(
+        "SELECT s.rows=2 AND s.sum=190 AND s.min=70 AND ROW(s.rows,s.non_nulls,s.sum,s.min,s.max) IS NOT DISTINCT FROM ROW(n.rows,n.non_nulls,n.sum,n.min,n.max) FROM syntra_heap_int4_summary('syntra_check_source','balance') AS s,(SELECT count(*) AS rows,count(balance) AS non_nulls,sum(balance),min(balance),max(balance) FROM syntra_check_source) AS n LIMIT 1", &[])?.try_get(0)?;
     require(
-        rejected
-            .as_db_error()
-            .is_some_and(|error| error.code().code() == "0A000"),
-        "serializable fresh scan returned an unexpected SQLSTATE",
+        serializable_matches,
+        "serializable fresh aggregate disagreed with native SQL",
     )?;
-    reader.batch_execute("ROLLBACK")?;
+    reader.batch_execute("COMMIT")?;
     reader.batch_execute("DROP TABLE syntra_check_projection; DROP TABLE syntra_check_source")?;
     writer.batch_execute(
         "CREATE TABLE fresh_lock_probe (v int4); INSERT INTO fresh_lock_probe (v) VALUES (1)",
@@ -144,7 +137,7 @@ pub(super) fn snapshot_checks(cluster: &Cluster, reader: &mut Client) -> Result<
         "read_committed",
         "atomic_refresh_rollback",
         "fresh_heap_read_only_no_xid",
-        "fresh_heap_serializable_rejected",
+        "fresh_heap_serializable",
         "fresh_heap_transaction_lock_retention",
     ])
 }

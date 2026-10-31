@@ -43,7 +43,9 @@ jobs:
               'upgrade-0.1.0', 'upgrade-0.2.0', 'upgrade-0.3.0',
               'upgrade-0.4.0', 'upgrade-0.5.0', 'upgrade-0.6.0',
               'upgrade-0.7.0', 'upgrade-load-0.7.0',
+              'upgrade-0.8.0', 'upgrade-load-0.8.0',
               'downgrade-0.7.0', 'downgrade-0.8.0',
+              'downgrade-0.9.0',
           ]
           selected = os.environ['SELECTED_CHECK']
           if selected != 'all':
@@ -101,9 +103,11 @@ jobs:
             topology-*) command=(bash scripts/replica-topology-check.sh "${CHECK#topology-}") ;;
             quorum-*) command=(bash scripts/quorum-check.sh "${CHECK#quorum-}") ;;
             upgrade-load-0.7.0) command=(bash scripts/upgrade-load-check.sh 0.7.0 30 100) ;;
+            upgrade-load-0.8.0) command=(bash scripts/upgrade-load-check.sh 0.8.0 30 100) ;;
             upgrade-*) command=(bash scripts/upgrade-check.sh "${CHECK#upgrade-}") ;;
             downgrade-0.7.0) command=(bash scripts/downgrade-0.7.0-check.sh) ;;
             downgrade-0.8.0) command=(bash scripts/downgrade-0.8.0-check.sh) ;;
+            downgrade-0.9.0) command=(bash scripts/downgrade-0.9.0-check.sh) ;;
             *) echo "Unknown verification check: $CHECK" >&2; exit 2 ;;
           esac
           timeout --signal=TERM --kill-after=60s 45m "${command[@]}" \
