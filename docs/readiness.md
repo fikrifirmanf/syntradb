@@ -73,3 +73,5 @@ tails. Next, test resource limits and longer retained snapshots. This does not
 change reader replay admission or enable automatic maintenance.
 
 The native Linux two-hour 0.7.0 soak failed its offered-load limits: writers missed about 17.1% of cycles and the repeatable-read worker missed 23.5%. Both recovered after the retained snapshot ended. See the [findings and versioned data](../benchmarks/checkpoint-soak-linux-2026-10-31.md). This leaves the load gate open.
+
+The complete native Linux [21-case lifecycle run](https://github.com/fikrifirmanf/syntradb/actions/runs/41168092491) passed on `d23f65b`. It covers the listed recovery, replication and version-lifecycle workloads. It does not override the failed two-hour offered-load result.
