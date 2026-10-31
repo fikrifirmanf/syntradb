@@ -34,3 +34,8 @@ and `normal.json`. Temporary fault injection was removed before the normal run.
 Existing soak-limit unit tests and benchmark tests also passed. The generic
 missing-test mapper does not recognize these embedded Rust tests; the real
 database runs above exercise the changed orchestration order.
+
+The [native Linux CI run](https://github.com/fikrifirmanf/syntradb/actions/runs/41172223169)
+also passed on `a790c73`. It includes 218 PostgreSQL tests, benchmark tests and
+six Python tests. This CI result supplements the local failure-order probes;
+it does not replace a new long soak.

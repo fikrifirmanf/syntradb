@@ -57,7 +57,9 @@ and `downgrade-080-to-060`.
 
 The GitHub workflow now contains 24 recovery and lifecycle cases. The
 [complete 0.8.0 run](https://github.com/fikrifirmanf/syntradb/actions/runs/41170126490)
-is still running and remains required before merging this feature. Grouping has no planner
+passed all 24 cases at commit `98b0322`, along with the planning job. The
+[versioned job record](../benchmarks/evidence/recovery-linux-080-2026-10-31.json)
+preserves each job's steps and conclusion. Grouping has no planner
 substitution, filters, multiple keys or spill to disk. The earlier two-hour
 checkpoint soak failed its offered-load limits; this additive API does not fix
 that throughput problem.

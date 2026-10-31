@@ -5,7 +5,7 @@ API with native PostgreSQL GROUP BY on the same heap and backend. Start it from
 GitHub Actions, or use:
 
 ```sh
-gh workflow run grouping.yml --ref main -f source_ref=feat/grouping-benchmark -f rows=1000000 -f repetitions=7
+gh workflow run grouping.yml --ref main -f source_ref=main -f rows=1000000 -f repetitions=7
 ```
 
 For a local harness check:
@@ -15,8 +15,8 @@ bash scripts/grouping-benchmark.sh --rows 10000 --repetitions 3
 ```
 
 The workflow lives on the default branch so GitHub can dispatch it. Its source
-ref selects the checkout to build and measure. Until the feature is merged, that
-input defaults to `feat/grouping-benchmark`. The artifact records the checked-out
+ref selects the checkout to build and measure. It defaults to `main`.
+The artifact records the checked-out
 commit, which can differ from the workflow's own commit.
 
 ## Workload

@@ -43,3 +43,7 @@ and the three acknowledgment-counter tests. The generic test connector does not
 detect this standalone unittest folder, so its skipped result is not the evidence
 for those six tests. The explicit command passed. The real scanner separately
 checked both project lockfiles against the advisory revision recorded above.
+
+The [native Linux dependency workflow](https://github.com/fikrifirmanf/syntradb/actions/runs/41172223087)
+also passed on `a790c73`. Its reports preserve the same unmaintained-package
+warning for review.

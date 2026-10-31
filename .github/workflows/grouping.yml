@@ -6,7 +6,7 @@ on:
       source_ref:
         description: Source branch or commit containing scripts/grouping-benchmark.sh
         type: string
-        default: 'feat/grouping-benchmark'
+        default: 'main'
       rows:
         description: Rows per dataset
         type: choice
