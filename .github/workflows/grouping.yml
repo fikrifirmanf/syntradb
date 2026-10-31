@@ -1,0 +1,113 @@
+name: Integer grouping benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Source branch or commit containing scripts/grouping-benchmark.sh
+        type: string
+        default: 'feat/grouping-benchmark'
+      rows:
+        description: Rows per dataset
+        type: choice
+        options: ['100000', '1000000']
+        default: '1000000'
+      repetitions:
+        description: Timed samples per route, following one warmup
+        type: choice
+        options: ['7', '15']
+        default: '7'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: grouping-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  grouping:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      BENCH_ROWS: ${{ inputs.rows }}
+      BENCH_REPETITIONS: ${{ inputs.repetitions }}
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source_ref }}
+      - name: Record source and runner
+        run: |
+          mkdir -p benchmarks/results/actions
+          {
+            git rev-parse HEAD
+            uname -a
+            lscpu
+            free -h
+            df -h
+            rustup show
+            printf 'Runner image: %s %s\n' "$ImageOS" "$ImageVersion"
+            printf 'Run: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+          } 2>&1 | tee benchmarks/results/actions/environment.txt
+      - name: Install PostgreSQL build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libicu-dev libreadline-dev zlib1g-dev libssl-dev libclang-dev clang bison flex
+      - name: Build project-local PostgreSQL and pgrx
+        timeout-minutes: 90
+        run: bash scripts/setup.sh 2>&1 | tee benchmarks/results/actions/setup.log
+      - name: Compare grouped aggregates on the same heap
+        timeout-minutes: 25
+        run: |
+          vmstat -t 10 > benchmarks/results/actions/load.log &
+          monitor_pid=$!
+          trap 'kill "$monitor_pid" 2>/dev/null || true' EXIT
+          timeout --signal=TERM --kill-after=60s 20m \
+            bash scripts/grouping-benchmark.sh --rows "$BENCH_ROWS" \
+              --repetitions "$BENCH_REPETITIONS" \
+              --output benchmarks/results/actions/grouping.json \
+            2>&1 | tee benchmarks/results/actions/grouping.log
+      - name: Verify completed comparison
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path('benchmarks/results/actions/grouping.json').read_text())
+          benchmark = report['grouping_benchmark']
+          default = benchmark['parallel_workers_default']
+          workers = [0] if default == 0 else [0, default]
+          expected = {(layout, budget, worker) for layout in ['int4/int4', 'int8/int8']
+                      for budget in [16, 1024, 65536] for worker in workers}
+          observed = set()
+          for case in benchmark['cases']:
+              observed.add((case['layout'], case['group_budget'], case['max_parallel_workers_per_gather']))
+              result = case['measurement']
+              if case['input_rows'] != int(os.environ['BENCH_ROWS']) or result['result_rows'] != case['input_rows']:
+                  raise SystemExit('Wrong row count in grouping comparison')
+              if result['results_match'] is not True or not 1 <= result['actual_groups'] <= case['group_budget']:
+                  raise SystemExit('Grouping comparison lacks complete matching results')
+              if case['input_rows'] == 1000000 and result['actual_groups'] != case['group_budget']:
+                  raise SystemExit('Million-row grouping dataset does not fill its group budget')
+              for route in ['native', 'rust_heap']:
+                  count = int(os.environ['BENCH_REPETITIONS'])
+                  if len(result[route]['prepared_request_ms']) != count or len(result[route]['explain']['samples']) != count:
+                      raise SystemExit('Incomplete grouping timing samples')
+          if observed != expected or len(benchmark['cases']) != len(expected):
+              raise SystemExit('Incomplete grouping benchmark matrix')
+          PY
+      - name: Save grouping logs, plans and samples
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: integer-grouping-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmarks/results/actions/
+          if-no-files-found: warn
+          retention-days: 7
