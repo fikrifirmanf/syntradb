@@ -5,10 +5,14 @@
 # and times can be compared as the old snapshot ages. The SQL below mirrors
 # crates/syntra-pg/src/capture.rs (syntra_capture_row, current_configuration,
 # position); keep them in step. The maintenance worker drains the feed as in
-# hold-control.sh. Usage: hold-explain.sh [targets, space-separated] [clients]
+# hold-control.sh. Writers are paced (RATE, default 200 per second in total):
+# unthrottled writers fill the 4,096-event capture log faster than the worker
+# drains it and fail with 54000.
+# Usage: hold-explain.sh [targets, space-separated] [clients]
 set -euo pipefail
 TARGETS="${1:-1000 30000 60000 80000}"
 CLIENTS="${2:-2}"
+RATE="${RATE:-200}"
 SYNTRA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$SYNTRA_ROOT"
 bash scripts/setup-production.sh >/dev/null
@@ -93,7 +97,7 @@ for chunk in $(seq 1 120); do
         next=$((next + 1))
     done
     (( next >= ${#targets[@]} )) && break
-    "$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c "$CLIENTS" -j "$CLIENTS" -T 20 -f "$WORK/captured.sql" feeds 2>&1 \
-        | awk '/^tps = /{tps=$3} /^latency average/{lat=$4} /^number of failed/{fail=$5} END{print "chunk tps="tps" latency_ms="lat" failed="fail}' | tee -a "$WORK/explain.log"
+    out="$("$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c "$CLIENTS" -j "$CLIENTS" -R "$RATE" -T 30 -f "$WORK/captured.sql" feeds 2>&1)" || echo "pgbench exited $?: $(printf '%s\n' "$out" | grep -i 'error\|abort' | head -3)" | tee -a "$WORK/explain.log"
+    printf '%s\n' "$out" | awk '/^tps = /{tps=$3} /^latency average/{lat=$4} /^number of failed/{fail=$5} END{print "chunk tps="tps" latency_ms="lat" failed="fail}' | tee -a "$WORK/explain.log"
 done
 echo "work dir $WORK"

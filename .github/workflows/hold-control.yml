@@ -136,7 +136,7 @@ jobs:
           bash benchmarks/scripts/hold-control.sh "$ROUNDS" "$SECONDS_PER_ROUND" "$RATE" "$SHAPE" \
             2>&1 | tee benchmarks/results/actions/hold-control.log
       - name: Summarize captured against plain
-        if: always()
+        if: always() && inputs.explain_targets == ''
         run: |
           python3 - <<'PY' | tee benchmarks/results/actions/summary.txt
           from pathlib import Path
