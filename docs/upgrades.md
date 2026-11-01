@@ -454,7 +454,7 @@ The downgrade removes only these three APIs and keeps capture history.
 `scripts/downgrade-0.10.0-check.sh` exercises both libraries, pending history,
 atomic dependency refusal and catalog equality with fresh installs. The
 [verification record](verification-0.10.0.md) distinguishes local results from
-pending native Linux checks.
+passing native Linux checks.
 
 ## Upgrade check
 

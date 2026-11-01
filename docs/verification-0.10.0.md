@@ -49,5 +49,8 @@ also passed. The [Linux evidence](../benchmarks/evidence/temporal-linux-2026-11-
 records terminal job steps, log hashes and the producer's archive checksum.
 
 The expanded [30-case lifecycle suite](https://github.com/fikrifirmanf/syntradb/actions/runs/41244510539)
-is still running. No performance claim or throughput-gate closure follows from
-these functional checks. The earlier held-snapshot load failure remains open.
+passed all 30 cases and its planning job at `205013b`. This includes recovery,
+maintenance, typed restores and replicas, topology and quorum checks, upgrades
+and downgrade round trips. The [terminal job record](../benchmarks/evidence/temporal-lifecycle-linux-2026-11-01.json)
+preserves every result. No performance claim or throughput-gate closure follows
+from these functional checks. The earlier held-snapshot load failure remains open.
