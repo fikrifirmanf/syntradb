@@ -52,6 +52,14 @@ checks, including text and UUID grouped sums. The
 [local evidence](../benchmarks/evidence/owned-grouping-local-2026-11-01.json)
 records the report and log hashes, package manifest and archive checksum at `031a6f2`.
 
-Native Linux CI, pilot archive installation and the expanded 33-case lifecycle
-suite remain pending. These functional checks make no performance claim and
-do not close the earlier held-snapshot throughput gate.
+The [native Linux CI run](https://github.com/fikrifirmanf/syntradb/actions/runs/41276204629)
+passed 246 PostgreSQL tests, 18 Python tests and the Rust checks at `031a6f2`.
+Both staged and extracted pilot archive installation checks passed. Text and
+UUID grouped sums match the fixture, and the loaded fingerprint matches the
+local build. The [dependency run](https://github.com/fikrifirmanf/syntradb/actions/runs/41276204657)
+also passed. The [Linux evidence](../benchmarks/evidence/owned-grouping-linux-2026-11-01.json)
+records terminal jobs, log hashes and the producer's archive checksum.
+
+The expanded [33-case lifecycle suite](https://github.com/fikrifirmanf/syntradb/actions/runs/41276235562)
+is still running. These functional checks make no performance claim and do
+not close the earlier held-snapshot throughput gate.
