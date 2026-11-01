@@ -3,6 +3,7 @@ use crate::native_catalog::{
     function_oid, guards_current, int8_key, oid_key, CatalogScan, Int8Comparison,
 };
 use pgrx::prelude::*;
+use pgrx::spi::OwnedPreparedStatement;
 use pgrx::trigger_support::{PgTriggerLevel, PgTriggerWhen};
 use pgrx::{AllocatedByPostgres, PgRelation};
 use std::{ffi::CStr, num::NonZeroUsize};
@@ -805,6 +806,72 @@ pub(super) fn feed_position(
         .ok_or("metadata_invalid")
 }
 
+/// Parsed and planned once per backend. The trigger fires for every changed row,
+/// and parsing plus planning its two statements each time cost about 0.3 ms of
+/// roughly 0.7 ms per firing (benchmarks/hold-control-linux-2026-11-01.md). The
+/// kept plans are revalidated by the plan cache when the catalogs change. The
+/// statements are leaked on purpose: freeing a plan during backend exit would
+/// touch memory that is already gone.
+fn kept_plan(
+    slot: &'static std::thread::LocalKey<std::cell::Cell<Option<&'static OwnedPreparedStatement>>>,
+    query: &str,
+    types: &[PgOid],
+) -> Result<&'static OwnedPreparedStatement, pgrx::spi::Error> {
+    if let Some(plan) = slot.with(|cell| cell.get()) {
+        return Ok(plan);
+    }
+    let plan: &'static OwnedPreparedStatement = Spi::connect_mut(|client| {
+        client
+            .prepare_mut(query, types)
+            .map(|prepared| &*Box::leak(Box::new(prepared.keep())))
+    })?;
+    slot.with(|cell| cell.set(Some(plan)));
+    Ok(plan)
+}
+thread_local! {
+    static HEAD_PLAN: std::cell::Cell<Option<&'static OwnedPreparedStatement>> = const { std::cell::Cell::new(None) };
+    static APPEND_PLAN: std::cell::Cell<Option<&'static OwnedPreparedStatement>> = const { std::cell::Cell::new(None) };
+}
+fn head_plan() -> Result<&'static OwnedPreparedStatement, pgrx::spi::Error> {
+    kept_plan(
+        &HEAD_PLAN,
+        r#"SELECT h.emitted,h.pruned+h.max_events,h.live_rows FROM syntra.capture_heads AS h
+        JOIN syntra.tracked_sources AS s ON s.source_relation=h.source_relation AND s.epoch=h.tracking_epoch
+        WHERE h.source_relation=$1 AND h.epoch=$2 AND h.row_trigger=$3 FOR NO KEY UPDATE OF h"#,
+        &[
+            PgOid::BuiltIn(PgBuiltInOids::OIDOID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8OID),
+            PgOid::BuiltIn(PgBuiltInOids::OIDOID),
+        ],
+    )
+}
+fn append_plan() -> Result<&'static OwnedPreparedStatement, pgrx::spi::Error> {
+    kept_plan(
+        &APPEND_PLAN,
+        r#"WITH inserted AS (
+        INSERT INTO syntra.capture_events(source_relation,epoch,ordinal,origin_xid,command_id,key,before_present,before_value,after_present,after_value)
+        SELECT $1,$2,$3+e.position,pg_catalog.pg_current_xact_id(),$9,e.key,e.bp,e.bv,e.ap,e.av
+        FROM unnest($4::int8[],$5::boolean[],$6::int8[],$7::boolean[],$8::int8[])
+        WITH ORDINALITY AS e(key,bp,bv,ap,av,position) RETURNING ordinal
+    ), marked AS (
+        INSERT INTO syntra.capture_marks(source_relation,epoch,ordinal,live_rows) VALUES($1,$2,$3+$10,$11)
+    ) SELECT count(*) FROM inserted"#,
+        &[
+            PgOid::BuiltIn(PgBuiltInOids::OIDOID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8OID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8OID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID),
+            PgOid::BuiltIn(PgBuiltInOids::BOOLARRAYOID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID),
+            PgOid::BuiltIn(PgBuiltInOids::BOOLARRAYOID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8OID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8OID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8OID),
+        ],
+    )
+}
+
 #[pg_trigger]
 fn syntra_capture_row<'a>(
     trigger: &'a PgTrigger<'a>,
@@ -852,16 +919,20 @@ fn syntra_capture_row<'a>(
     // This trigger is deferred, so the first firing takes the lock at commit and
     // the transaction's earlier statements run without it. SET CONSTRAINTS
     // IMMEDIATE fires it per statement instead, holding the lock from there.
-    let (floor, limit, floor_rows) = Spi::get_three_with_args::<i64, i64, i64>(
-        r#"SELECT h.emitted,h.pruned+h.max_events,h.live_rows FROM syntra.capture_heads AS h
-        JOIN syntra.tracked_sources AS s ON s.source_relation=h.source_relation AND s.epoch=h.tracking_epoch
-        WHERE h.source_relation=$1 AND h.epoch=$2 AND h.row_trigger=$3 FOR NO KEY UPDATE OF h"#,
-        &[
-            oid.into(),
-            config.epoch.into(),
-            trigger.trigger().tgoid.into(),
-        ],
-    )?;
+    let (floor, limit, floor_rows) = Spi::connect_mut(|client| {
+        client
+            .update(
+                head_plan()?,
+                Some(1),
+                &[
+                    oid.into(),
+                    config.epoch.into(),
+                    trigger.trigger().tgoid.into(),
+                ],
+            )?
+            .first()
+            .get_three::<i64, i64, i64>()
+    })?;
     let (Some(floor), Some(limit), Some(floor_rows)) = (floor, limit, floor_rows) else {
         full()
     };
@@ -880,29 +951,28 @@ fn syntra_capture_row<'a>(
     {
         full();
     }
-    let inserted = Spi::get_one_with_args::<i64>(
-        r#"WITH inserted AS (
-        INSERT INTO syntra.capture_events(source_relation,epoch,ordinal,origin_xid,command_id,key,before_present,before_value,after_present,after_value)
-        SELECT $1,$2,$3+e.position,pg_catalog.pg_current_xact_id(),$9,e.key,e.bp,e.bv,e.ap,e.av
-        FROM unnest($4::int8[],$5::boolean[],$6::int8[],$7::boolean[],$8::int8[])
-        WITH ORDINALITY AS e(key,bp,bv,ap,av,position) RETURNING ordinal
-    ), marked AS (
-        INSERT INTO syntra.capture_marks(source_relation,epoch,ordinal,live_rows) VALUES($1,$2,$3+$10,$11)
-    ) SELECT count(*) FROM inserted"#,
-        &[
-            oid.into(),
-            config.epoch.into(),
-            emitted.into(),
-            keys.into(),
-            before.into(),
-            old.into(),
-            after.into(),
-            new.into(),
-            command.into(),
-            i64::from(count).into(),
-            live.into(),
-        ],
-    )?;
+    let inserted = Spi::connect_mut(|client| {
+        client
+            .update(
+                append_plan()?,
+                Some(1),
+                &[
+                    oid.into(),
+                    config.epoch.into(),
+                    emitted.into(),
+                    keys.into(),
+                    before.into(),
+                    old.into(),
+                    after.into(),
+                    new.into(),
+                    command.into(),
+                    i64::from(count).into(),
+                    live.into(),
+                ],
+            )?
+            .first()
+            .get_one::<i64>()
+    })?;
     if inserted != Some(i64::from(count)) {
         full();
     }
