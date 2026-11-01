@@ -1,0 +1,117 @@
+name: Held-snapshot writer control
+
+# Runs benchmarks/scripts/hold-control.sh: a captured table and a plain table take
+# the same paced writes while one repeatable-read session holds an old snapshot.
+# It measures capture overhead against native PostgreSQL on the current code.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: Alternating rounds; each is one captured and one plain run
+        type: choice
+        options:
+          - '40'
+          - '20'
+          - '2'
+        default: '40'
+      seconds:
+        description: Seconds per round
+        type: choice
+        options:
+          - '30'
+          - '10'
+        default: '30'
+      rate:
+        description: Offered transactions per second per table
+        type: choice
+        options:
+          - '200'
+          - '100'
+        default: '200'
+      shape:
+        description: transfer (two updates) or cycle (adds the soak writer's insert, move and delete)
+        type: choice
+        options:
+          - cycle
+          - transfer
+        default: cycle
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: hold-control-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      ROUNDS: ${{ inputs.rounds }}
+      SECONDS_PER_ROUND: ${{ inputs.seconds }}
+      RATE: ${{ inputs.rate }}
+      SHAPE: ${{ inputs.shape }}
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Record source and runner
+        run: |
+          mkdir -p benchmarks/results/actions
+          {
+            git rev-parse HEAD
+            grep -m1 '^version' Cargo.toml
+            uname -a
+            lscpu
+            free -h
+            printf 'Runner image: %s %s\n' "$ImageOS" "$ImageVersion"
+            printf 'Run: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf 'rounds=%s seconds=%s rate=%s shape=%s\n' "$ROUNDS" "$SECONDS_PER_ROUND" "$RATE" "$SHAPE"
+          } 2>&1 | tee benchmarks/results/actions/environment.txt
+      - name: Install PostgreSQL build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libicu-dev libreadline-dev zlib1g-dev libssl-dev libclang-dev clang bison flex
+      - name: Build project-local PostgreSQL and pgrx
+        timeout-minutes: 90
+        run: bash scripts/setup.sh 2>&1 | tee benchmarks/results/actions/setup.log
+      - name: Run held-snapshot control
+        timeout-minutes: 120
+        run: |
+          vmstat -t 60 > benchmarks/results/actions/load.log &
+          monitor_pid=$!
+          trap 'kill "$monitor_pid" 2>/dev/null || true' EXIT
+          bash benchmarks/scripts/hold-control.sh "$ROUNDS" "$SECONDS_PER_ROUND" "$RATE" "$SHAPE" \
+            2>&1 | tee benchmarks/results/actions/hold-control.log
+      - name: Summarize captured against plain
+        if: always()
+        run: |
+          python3 - <<'PY' | tee benchmarks/results/actions/summary.txt
+          from pathlib import Path
+          rows = {}
+          for line in Path('benchmarks/results/actions/hold-control.log').read_text().splitlines():
+              p = line.split()
+              if len(p) == 7 and p[1] in ('plain', 'captured') and p[0].isdigit():
+                  rows.setdefault(int(p[0]), {})[p[1]] = p[2:]
+          print('round plain_lat_ms captured_lat_ms captured_tps captured_failed dead_tuples horizon_age')
+          for r in sorted(rows):
+              d = rows[r]
+              if 'plain' in d and 'captured' in d:
+                  c, p = d['captured'], d['plain']
+                  print(r, p[1], c[1], c[0], c[2], c[3], c[4])
+          PY
+      - name: Save logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hold-control-${{ github.run_id }}-${{ github.run_attempt }}
+          path: benchmarks/results/actions/
+          if-no-files-found: warn
+          retention-days: 14
