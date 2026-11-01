@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "source_commit": "031a6f29dba69e1d091c89a9f48907d6cbd475c1",
+  "version": "0.11.0",
+  "source_fingerprint": "4dcf8997f4b929b5b306856cf7d8b7d53b24886829e28d6d926d3d18a75fdfba",
+  "extension_source_fingerprint": "4dcf8997f4b929b5b306856cf7d8b7d53b24886829e28d6d926d3d18a75fdfba",
+  "report_sha256": "cc95fe7d087979b83e53a18805716895f98ea6548c670814edfe43604a145206",
+  "test_counts": {
+    "postgresql": 246,
+    "new_owned_grouping_postgresql": 16,
+    "new_owned_grouping_kernel": 6,
+    "python": 18
+  },
+  "ssi_checks": [
+    "serializable read-write, read-only and deferrable fresh reads without assigned XIDs",
+    "source relation predicate locks, including empty and unmatched range reads",
+    "write skew aborts one transaction with 40001 for custom and mixed native/custom reads",
+    "empty-table and range-insertion phantoms abort one transaction with 40001",
+    "read-time 40001 unwinds each native heap scan and permits reuse after rollback",
+    "date, timestamp and timestamptz filters retain RR snapshots across concurrent predicate/value changes",
+    "matching and fully filtered temporal scans honor cancellation and allow subsequent backend reuse",
+    "text and UUID grouping retain key/value snapshot pairs and permit reuse after cancellation",
+    "text grouping refuses non-UTF8 databases while UUID grouping remains available",
+    "native invariants checked after participant transactions, without masking custom dependencies",
+    "capture, live reuse and checkpoint reuse remain explicitly unsupported under SSI"
+  ],
+  "version_lifecycle": {
+    "upgrade": "0.10->0.11 with 542 catalog entries matching fresh install",
+    "live_upgrade": "30 seconds; 1892 writes committed, zero failed; heap/events/drained checkpoint agreed",
+    "downgrade": "0.11->0.10->0.11 with both libraries, dependency refusal and fresh-catalog parity"
+  },
+  "negative_controls": [
+    "Disabling distinct-key byte accounting failed the budget test; guard restored.",
+    "Disabling deterministic-collation admission failed the rejection test; guard restored."
+  ],
+  "logs_sha256": {
+    "owned-final-check.log": "fbae22306c87598a2b686dc251c483bfb86169e8a6e6013024a60dd548f7aec5",
+    "owned-final-contract.log": "5bb34b9a05652e4d0637a1c4b9b91ebdd6220e74e88a6c3c63f7f2198d8033d6",
+    "owned-groups-upgrade.log": "861481fc878ac5e7ef03d92d31af2669eead1889962d4f0fdbf303620055c9d6",
+    "owned-groups-downgrade.log": "b85f9ab00d05800058c8df24110321357b78183a9eb12ff0e4c726f63596c6d8",
+    "owned-groups-upgrade-load.log": "7b6d2d52c7a48195a27cf3720e10d47f4cd9fd2b9b89af2c50eb03b4a5122103",
+    "owned-budget-negative.log": "bffc2a288cefb09534ae46126d45577cbdc0ebacdcfac09bb744b78b6ec89ff9",
+    "owned-collation-negative.log": "f0fb1f6f8118d2e8b4a540883c9f264428eaf5df007ab03181d6e91bdc5f6685"
+  },
+  "pilot_package": {
+    "sha256sums": "c53aade7a903df1a2d0a48fc6ed6067ffbbc004f38713c9895f21c0527cf3c44  syntradb-0.11.0-pg18-aarch64-apple-darwin-pilot.tar.gz\n",
+    "manifest": {
+      "schema_version": 1,
+      "status": "pilot; not a production release",
+      "commit": "031a6f29dba69e1d091c89a9f48907d6cbd475c1",
+      "version": "0.11.0",
+      "source_fingerprint": "4dcf8997f4b929b5b306856cf7d8b7d53b24886829e28d6d926d3d18a75fdfba",
+      "postgresql": "PostgreSQL 18.6",
+      "postgresql_configure": "'--prefix=/Users/fikrifirmanf/Development/syntradb/.tools/postgresql-production/18.6/install' '--with-pgport=28918' '--disable-cassert' '--disable-debug' 'CFLAGS=-O2' 'PKG_CONFIG_PATH=/opt/homebrew/opt/icu4c@79/lib/pkgconfig'",
+      "platform": "macOS-27.0.1-arm64-arm-64bit",
+      "libc": [
+        "",
+        ""
+      ],
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1",
+      "files": {
+        "LICENSE": {
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "bytes": 35149
+        },
+        "extension/syntradb--0.1.0--0.2.0.sql": {
+          "sha256": "355ae79b2b13849f0191b5af633acce1dfc30e7d541e5935d1ff1ecb84d94192",
+          "bytes": 5079
+        },
+        "extension/syntradb--0.10.0--0.11.0.sql": {
+          "sha256": "cb5919989483bf131f27f718563240ae3dde81d842e65533487c4e55ffda7d95",
+          "bytes": 897
+        },
+        "extension/syntradb--0.10.0--0.9.0.sql": {
+          "sha256": "1acb83f2bfe0b4a49213ba50721fdb30ad75f4dec4934e87719bf8a89837f459",
+          "bytes": 428
+        },
+        "extension/syntradb--0.11.0--0.10.0.sql": {
+          "sha256": "8758c9d613a23b1e22937eb0099b37777d9bc8390fa76663fa16ba12c4203c8c",
+          "bytes": 336
+        },
+        "extension/syntradb--0.11.0.sql": {
+          "sha256": "2361d309cfbb2dae5c9d6c52dc7632dcca1e8637cf2b395ca5ad351a3e6992f9",
+          "bytes": 39785
+        },
+        "extension/syntradb--0.2.0--0.3.0.sql": {
+          "sha256": "136d236dd8a1bc63b66f875d86db4f5f3c2f68410fc8831e929ed17a241638c5",
+          "bytes": 1742
+        },
+        "extension/syntradb--0.3.0--0.4.0.sql": {
+          "sha256": "2dfe45a1601afee900da14a7479bdba2e5fe879331ba24ff6aebe7db504aea78",
+          "bytes": 1753
+        },
+        "extension/syntradb--0.4.0--0.3.0.sql": {
+          "sha256": "2d39d8c2e23fdf14dfe94410d80302370ec9578a03346364a42b2cead9de7848",
+          "bytes": 1992
+        },
+        "extension/syntradb--0.4.0--0.5.0.sql": {
+          "sha256": "9df3f4619ede87b5c1eec4db0c72def9944d7d8e0773433e5c239e688a4ec3f5",
+          "bytes": 892
+        },
+        "extension/syntradb--0.5.0--0.4.0.sql": {
+          "sha256": "795ce9602e86ad5bd1f879bef47d610bc71da5ab5c1c82d66dfa184fe0a35ce0",
+          "bytes": 1264
+        },
+        "extension/syntradb--0.5.0--0.6.0.sql": {
+          "sha256": "f18762cf11066fb4d6f6439545809f3746373d6a2340691e83ebc70c762b0ef4",
+          "bytes": 2345
+        },
+        "extension/syntradb--0.6.0--0.5.0.sql": {
+          "sha256": "1506e0d10af858f8d348ed65112fcdcd6b9cb4dd561b6e3feb033d37ad5d6656",
+          "bytes": 2070
+        },
+        "extension/syntradb--0.6.0--0.7.0.sql": {
+          "sha256": "8386c552c94e24fa1b0028dabea53e03bcf17db23db70d49887203d449db388a",
+          "bytes": 1245
+        },
+        "extension/syntradb--0.7.0--0.6.0.sql": {
+          "sha256": "9171a7dd80f29989db6bc136ea2311b763a2fbf5dbe98b99b53b5d65dceaf762",
+          "bytes": 1278
+        },
+        "extension/syntradb--0.7.0--0.8.0.sql": {
+          "sha256": "6d0f318e4d3df7f68fbe28cd79b0a73b54b8ab7e169019af7696e849bf9dfc30",
+          "bytes": 512
+        },
+        "extension/syntradb--0.8.0--0.7.0.sql": {
+          "sha256": "6981d51f2fda7521cd74401d90cac3d73274257a1ec1dd34487b281e80306167",
+          "bytes": 239
+        },
+        "extension/syntradb--0.8.0--0.9.0.sql": {
+          "sha256": "ff8a0ffc1775fc46391a8fd85d3015615429b3d8527d7a0610bb88746940d63d",
+          "bytes": 302
+        },
+        "extension/syntradb--0.9.0--0.10.0.sql": {
+          "sha256": "db50dbe830b98de7b8f8292557709047981fa3d11d625e6452d390f9a96fbddf",
+          "bytes": 1101
+        },
+        "extension/syntradb--0.9.0--0.8.0.sql": {
+          "sha256": "6db9dd1ae9e9fb2345eaf5a8cc1d7bc4dca4ef99894accb48c9317ae15ef01e8",
+          "bytes": 317
+        },
+        "extension/syntradb.control": {
+          "sha256": "188bf8718fd1ee5221647e177aa7542da65ca28e14acd01ac7ad8613c4384c25",
+          "bytes": 190
+        },
+        "lib/syntradb.dylib": {
+          "sha256": "a5d7f922ff6f9936df4d987f78ce7e089cabbfa8c210da32bf9fd4464c9e6bc6",
+          "bytes": 2582352
+        },
+        "source.tar.gz": {
+          "sha256": "a98e218d51da102083af9ba419a25637df5a90e7736cc9fafefb29049ea541e5",
+          "bytes": 7901507
+        },
+        "verification.json": {
+          "sha256": "26f844f2e48010b72b99c77a910d4d38c4635420294ade48da5beb9b0d60ccfe",
+          "bytes": 383
+        }
+      },
+      "source_date_epoch": 1793510098,
+      "build_environment": {}
+    },
+    "verification": {
+      "status": "passed",
+      "checks": {
+        "version": "0.11.0",
+        "profile": "release",
+        "fingerprint": "4dcf8997f4b929b5b306856cf7d8b7d53b24886829e28d6d926d3d18a75fdfba",
+        "rows": 2,
+        "sum": 31,
+        "route": "checkpoint",
+        "pending": 0,
+        "time_sum": 31,
+        "text_group_sum": 31,
+        "uuid_group_sum": 31
+      },
+      "fresh_heap_ssi": "2|31",
+      "private_install": true
+    }
+  },
+  "limitations": [
+    "Deterministic text source collations and UTF8 databases only; nondeterministic collations rejected.",
+    "Values are integers; new grouping APIs do not accept decimal measures.",
+    "Logical distinct-key bytes and group count are bounded, not backend RSS.",
+    "Native Linux CI and 33-case lifecycle suite pending.",
+    "Prior held-snapshot throughput gate remains open; no performance claim."
+  ]
+}

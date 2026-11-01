@@ -45,6 +45,13 @@ The old library reports its original source fingerprint during the downgrade.
 The [provenance record](../build-support/upgrade-baselines/syntradb-0.10.0-src.json)
 lists retained files and exclusions.
 
+The final production runner and library share source fingerprint
+`4dcf8997f4b929b5b306856cf7d8b7d53b24886829e28d6d926d3d18a75fdfba`.
+The macOS arm64 pilot archive passed both staged and extracted installation
+checks, including text and UUID grouped sums. The
+[local evidence](../benchmarks/evidence/owned-grouping-local-2026-11-01.json)
+records the report and log hashes, package manifest and archive checksum at `031a6f2`.
+
 Native Linux CI, pilot archive installation and the expanded 33-case lifecycle
 suite remain pending. These functional checks make no performance claim and
 do not close the earlier held-snapshot throughput gate.
