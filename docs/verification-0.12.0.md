@@ -1,9 +1,8 @@
 # Version 0.12 verification
 
-The grouped decimal implementation is on `feat/grouped-decimal-measures` in
-[draft PR 1](https://github.com/fikrifirmanf/syntradb/pull/1). Main remains on
-verified 0.11 until the Linux checks finish. This record makes no throughput or
-production-readiness claim.
+The grouped decimal implementation merged to `main` through
+[PR 1](https://github.com/fikrifirmanf/syntradb/pull/1) as merge commit
+`cc1b003`. This record makes no throughput or production-readiness claim.
 
 ## Local checks
 
@@ -45,12 +44,14 @@ coverage evidence above.
 
 ## GitHub checks
 
-The following runs are pending at the time this record was written:
+All Linux and dependency checks passed:
 
-- [Rust, PostgreSQL, pilot bundle and native concurrency checks](https://github.com/fikrifirmanf/syntradb/actions/runs/41291002834).
-- [Dependency advisories](https://github.com/fikrifirmanf/syntradb/actions/runs/41291004683).
-- [All 36 recovery and lifecycle cases](https://github.com/fikrifirmanf/syntradb/actions/runs/41291005719).
+- [Rust, PostgreSQL, pilot bundle and native concurrency checks](https://github.com/fikrifirmanf/syntradb/actions/runs/41291238535)
+  on the PR head `86ba653`, and again on [`main` after the merge](https://github.com/fikrifirmanf/syntradb/actions/runs/41310691858).
+- [Dependency advisories](https://github.com/fikrifirmanf/syntradb/actions/runs/41291238476)
+  on the PR head, and again on [`main` after the merge](https://github.com/fikrifirmanf/syntradb/actions/runs/41310691857).
+- [All 36 recovery and lifecycle cases](https://github.com/fikrifirmanf/syntradb/actions/runs/41291005719),
+  run on `1c9c5de`. The later `86ba653` commit only added this record.
 
-Linux success must be recorded from completed jobs before merging. The existing
-held-snapshot throughput gate remains failed. These correctness checks do not
-replace that performance gate.
+The existing held-snapshot throughput gate remains failed. These correctness
+checks do not replace that performance gate.
