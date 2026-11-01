@@ -150,3 +150,29 @@ every age. At the same ages the paced writers' average latency went from 5.3 ms 
 2. Do the head lock and the event and mark insert once per transaction instead of
    once per changed row.
 3. Insert the event and mark rows through the heap API instead of SQL.
+
+## Kept SPI plans
+
+[Run 41332804819](https://github.com/fikrifirmanf/syntradb/actions/runs/41332804819)
+repeated the 40-round control with the capture trigger's two statements prepared once
+per backend ([data](evidence/hold-control-saved-plans-linux-2026-11-02.json)). The
+plain table, which the change does not touch, behaved almost identically in both runs
+(for example 76 ms against 64 ms in round 6), so the runner did not drift much.
+
+| Round | Horizon age | Captured, before | Captured, kept plans | Plain, same run |
+|---|---|---|---|---|
+| 1 | 12,868 | 5 ms / 199 tps | 3 ms / 206 | 2 ms |
+| 4 | 50,914 | 88 ms / 201 | 26 ms / 202 | 11 ms |
+| 5 | 63,409 | 713 ms / 183 | 215 ms / 195 | 22 ms |
+| 6 | 75,082 | 3,353 ms / 154 | 1,880 ms / 171 | 64 ms |
+| 8 | 95,689 | 5,157 ms / 126 | 4,236 ms / 135 | 1,995 ms |
+| 20 | 175,507 | 9,644 ms / 71 | 10,007 ms / 68 | 8,550 ms |
+| 40 | 259,021 | 11,648 ms / 44 | 11,608 ms / 44 | 10,579 ms |
+
+The change helps, modestly. Per-transaction latency below the cliff drops by about a
+third, and the cliff moves right by roughly one round (about 12,000 of horizon age).
+It does not close the gap: at about 75,000 captured still averages 1,880 ms against
+64 ms for plain, and past about 100,000 both tables are saturated and the two runs
+are indistinguishable. This is one run each, so differences of a few percent are
+within noise. The remaining per-firing cost (the head-row lock, the event and mark
+insert, and five firings per cycle) is untouched.
