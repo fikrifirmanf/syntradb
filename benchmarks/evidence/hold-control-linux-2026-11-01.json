@@ -1,0 +1,731 @@
+{
+ "run": "https://github.com/fikrifirmanf/syntradb/actions/runs/41315009198",
+ "version": "0.12.0",
+ "commit": "5c95bb3 (main after PR 4; same extension source as the 0.12.0 release)",
+ "runner": "ubuntu-24.04 GitHub-hosted",
+ "script": "benchmarks/scripts/hold-control.sh 40 30 200 cycle",
+ "note": "Workflow added in PR 4; run on main after merge. Latency is pgbench -R average and includes time behind schedule.",
+ "sums_match": true,
+ "rows": [
+  {
+   "round": 1,
+   "table": "plain",
+   "tps": 200.533395,
+   "latency_ms": 1.825,
+   "failed": 0,
+   "dead_tuples": 24060,
+   "horizon_age": 6240
+  },
+  {
+   "round": 1,
+   "table": "captured",
+   "tps": 199.49971,
+   "latency_ms": 5.303,
+   "failed": 0,
+   "dead_tuples": 23936,
+   "horizon_age": 12668
+  },
+  {
+   "round": 2,
+   "table": "plain",
+   "tps": 198.927949,
+   "latency_ms": 3.946,
+   "failed": 0,
+   "dead_tuples": 48468,
+   "horizon_age": 18943
+  },
+  {
+   "round": 2,
+   "table": "captured",
+   "tps": 195.426272,
+   "latency_ms": 9.392,
+   "failed": 0,
+   "dead_tuples": 47388,
+   "horizon_age": 25252
+  },
+  {
+   "round": 3,
+   "table": "plain",
+   "tps": 200.815467,
+   "latency_ms": 6.875,
+   "failed": 0,
+   "dead_tuples": 72417,
+   "horizon_age": 31580
+  },
+  {
+   "round": 3,
+   "table": "captured",
+   "tps": 192.866621,
+   "latency_ms": 17.904,
+   "failed": 0,
+   "dead_tuples": 70536,
+   "horizon_age": 37799
+  },
+  {
+   "round": 4,
+   "table": "plain",
+   "tps": 201.457668,
+   "latency_ms": 11.04,
+   "failed": 0,
+   "dead_tuples": 96716,
+   "horizon_age": 44146
+  },
+  {
+   "round": 4,
+   "table": "captured",
+   "tps": 200.966827,
+   "latency_ms": 88.187,
+   "failed": 0,
+   "dead_tuples": 94656,
+   "horizon_age": 50602
+  },
+  {
+   "round": 5,
+   "table": "plain",
+   "tps": 199.92401,
+   "latency_ms": 21.161,
+   "failed": 0,
+   "dead_tuples": 120644,
+   "horizon_age": 56901
+  },
+  {
+   "round": 5,
+   "table": "captured",
+   "tps": 182.651116,
+   "latency_ms": 712.523,
+   "failed": 0,
+   "dead_tuples": 116580,
+   "horizon_age": 62787
+  },
+  {
+   "round": 6,
+   "table": "plain",
+   "tps": 198.369921,
+   "latency_ms": 75.562,
+   "failed": 0,
+   "dead_tuples": 144508,
+   "horizon_age": 69042
+  },
+  {
+   "round": 6,
+   "table": "captured",
+   "tps": 154.074472,
+   "latency_ms": 3352.924,
+   "failed": 0,
+   "dead_tuples": 135076,
+   "horizon_age": 74026
+  },
+  {
+   "round": 7,
+   "table": "plain",
+   "tps": 184.550608,
+   "latency_ms": 875.839,
+   "failed": 0,
+   "dead_tuples": 166620,
+   "horizon_age": 79865
+  },
+  {
+   "round": 7,
+   "table": "captured",
+   "tps": 138.473765,
+   "latency_ms": 4574.432,
+   "failed": 0,
+   "dead_tuples": 151712,
+   "horizon_age": 84369
+  },
+  {
+   "round": 8,
+   "table": "plain",
+   "tps": 165.5981,
+   "latency_ms": 2614.924,
+   "failed": 0,
+   "dead_tuples": 186415,
+   "horizon_age": 89639
+  },
+  {
+   "round": 8,
+   "table": "captured",
+   "tps": 125.737861,
+   "latency_ms": 5156.86,
+   "failed": 0,
+   "dead_tuples": 166824,
+   "horizon_age": 93759
+  },
+  {
+   "round": 9,
+   "table": "plain",
+   "tps": 150.240214,
+   "latency_ms": 3429.369,
+   "failed": 0,
+   "dead_tuples": 204372,
+   "horizon_age": 98567
+  },
+  {
+   "round": 9,
+   "table": "captured",
+   "tps": 115.310233,
+   "latency_ms": 6496.813,
+   "failed": 0,
+   "dead_tuples": 180664,
+   "horizon_age": 102363
+  },
+  {
+   "round": 10,
+   "table": "plain",
+   "tps": 142.222264,
+   "latency_ms": 4276.782,
+   "failed": 0,
+   "dead_tuples": 221416,
+   "horizon_age": 106931
+  },
+  {
+   "round": 10,
+   "table": "captured",
+   "tps": 113.557779,
+   "latency_ms": 6229.238,
+   "failed": 0,
+   "dead_tuples": 194296,
+   "horizon_age": 110672
+  },
+  {
+   "round": 11,
+   "table": "plain",
+   "tps": 132.201653,
+   "latency_ms": 4844.57,
+   "failed": 0,
+   "dead_tuples": 237255,
+   "horizon_age": 114940
+  },
+  {
+   "round": 11,
+   "table": "captured",
+   "tps": 106.658198,
+   "latency_ms": 6833.995,
+   "failed": 0,
+   "dead_tuples": 207096,
+   "horizon_age": 118467
+  },
+  {
+   "round": 12,
+   "table": "plain",
+   "tps": 124.630374,
+   "latency_ms": 5586.357,
+   "failed": 0,
+   "dead_tuples": 252176,
+   "horizon_age": 122510
+  },
+  {
+   "round": 12,
+   "table": "captured",
+   "tps": 97.714796,
+   "latency_ms": 7384.987,
+   "failed": 0,
+   "dead_tuples": 218828,
+   "horizon_age": 125761
+  },
+  {
+   "round": 13,
+   "table": "plain",
+   "tps": 111.115879,
+   "latency_ms": 6708.645,
+   "failed": 0,
+   "dead_tuples": 265480,
+   "horizon_age": 129397
+  },
+  {
+   "round": 13,
+   "table": "captured",
+   "tps": 88.234196,
+   "latency_ms": 8236.029,
+   "failed": 0,
+   "dead_tuples": 229420,
+   "horizon_age": 132360
+  },
+  {
+   "round": 14,
+   "table": "plain",
+   "tps": 108.152377,
+   "latency_ms": 6925.602,
+   "failed": 0,
+   "dead_tuples": 278444,
+   "horizon_age": 135907
+  },
+  {
+   "round": 14,
+   "table": "captured",
+   "tps": 91.329362,
+   "latency_ms": 8120.139,
+   "failed": 0,
+   "dead_tuples": 240384,
+   "horizon_age": 138966
+  },
+  {
+   "round": 15,
+   "table": "plain",
+   "tps": 108.476546,
+   "latency_ms": 6975.776,
+   "failed": 0,
+   "dead_tuples": 291460,
+   "horizon_age": 142523
+  },
+  {
+   "round": 15,
+   "table": "captured",
+   "tps": 85.928667,
+   "latency_ms": 8409.622,
+   "failed": 0,
+   "dead_tuples": 250696,
+   "horizon_age": 145413
+  },
+  {
+   "round": 16,
+   "table": "plain",
+   "tps": 103.330177,
+   "latency_ms": 7490.552,
+   "failed": 0,
+   "dead_tuples": 303844,
+   "horizon_age": 148815
+  },
+  {
+   "round": 16,
+   "table": "captured",
+   "tps": 84.293605,
+   "latency_ms": 8319.839,
+   "failed": 0,
+   "dead_tuples": 260812,
+   "horizon_age": 151652
+  },
+  {
+   "round": 17,
+   "table": "plain",
+   "tps": 100.474693,
+   "latency_ms": 7335.611,
+   "failed": 0,
+   "dead_tuples": 315872,
+   "horizon_age": 154969
+  },
+  {
+   "round": 17,
+   "table": "captured",
+   "tps": 77.340634,
+   "latency_ms": 9290.333,
+   "failed": 0,
+   "dead_tuples": 270096,
+   "horizon_age": 157581
+  },
+  {
+   "round": 18,
+   "table": "plain",
+   "tps": 97.430851,
+   "latency_ms": 8007.17,
+   "failed": 0,
+   "dead_tuples": 327564,
+   "horizon_age": 160806
+  },
+  {
+   "round": 18,
+   "table": "captured",
+   "tps": 75.426406,
+   "latency_ms": 9032.964,
+   "failed": 0,
+   "dead_tuples": 279172,
+   "horizon_age": 163381
+  },
+  {
+   "round": 19,
+   "table": "plain",
+   "tps": 93.058478,
+   "latency_ms": 8059.958,
+   "failed": 0,
+   "dead_tuples": 338700,
+   "horizon_age": 166472
+  },
+  {
+   "round": 19,
+   "table": "captured",
+   "tps": 71.864875,
+   "latency_ms": 9725.122,
+   "failed": 0,
+   "dead_tuples": 287804,
+   "horizon_age": 168903
+  },
+  {
+   "round": 20,
+   "table": "plain",
+   "tps": 89.82889,
+   "latency_ms": 8588.476,
+   "failed": 0,
+   "dead_tuples": 349460,
+   "horizon_age": 171897
+  },
+  {
+   "round": 20,
+   "table": "captured",
+   "tps": 71.091851,
+   "latency_ms": 9644.297,
+   "failed": 0,
+   "dead_tuples": 296340,
+   "horizon_age": 174298
+  },
+  {
+   "round": 21,
+   "table": "plain",
+   "tps": 88.178952,
+   "latency_ms": 8381.628,
+   "failed": 0,
+   "dead_tuples": 360028,
+   "horizon_age": 177243
+  },
+  {
+   "round": 21,
+   "table": "captured",
+   "tps": 67.083285,
+   "latency_ms": 9859.801,
+   "failed": 0,
+   "dead_tuples": 304396,
+   "horizon_age": 179536
+  },
+  {
+   "round": 22,
+   "table": "plain",
+   "tps": 85.679161,
+   "latency_ms": 8303.32,
+   "failed": 0,
+   "dead_tuples": 370289,
+   "horizon_age": 182409
+  },
+  {
+   "round": 22,
+   "table": "captured",
+   "tps": 66.09916,
+   "latency_ms": 10008.487,
+   "failed": 0,
+   "dead_tuples": 312332,
+   "horizon_age": 184654
+  },
+  {
+   "round": 23,
+   "table": "plain",
+   "tps": 83.456029,
+   "latency_ms": 8759.301,
+   "failed": 0,
+   "dead_tuples": 380612,
+   "horizon_age": 187457
+  },
+  {
+   "round": 23,
+   "table": "captured",
+   "tps": 65.007081,
+   "latency_ms": 10120.827,
+   "failed": 0,
+   "dead_tuples": 320140,
+   "horizon_age": 189658
+  },
+  {
+   "round": 24,
+   "table": "plain",
+   "tps": 81.340274,
+   "latency_ms": 8697.157,
+   "failed": 0,
+   "dead_tuples": 390372,
+   "horizon_age": 192398
+  },
+  {
+   "round": 24,
+   "table": "captured",
+   "tps": 62.60202,
+   "latency_ms": 10216.249,
+   "failed": 0,
+   "dead_tuples": 327656,
+   "horizon_age": 194525
+  },
+  {
+   "round": 25,
+   "table": "plain",
+   "tps": 75.640625,
+   "latency_ms": 9423.704,
+   "failed": 0,
+   "dead_tuples": 399412,
+   "horizon_age": 197095
+  },
+  {
+   "round": 25,
+   "table": "captured",
+   "tps": 58.343212,
+   "latency_ms": 10681.966,
+   "failed": 0,
+   "dead_tuples": 334676,
+   "horizon_age": 199093
+  },
+  {
+   "round": 26,
+   "table": "plain",
+   "tps": 70.767171,
+   "latency_ms": 9808.646,
+   "failed": 0,
+   "dead_tuples": 407868,
+   "horizon_age": 201516
+  },
+  {
+   "round": 26,
+   "table": "captured",
+   "tps": 58.266862,
+   "latency_ms": 10630.925,
+   "failed": 0,
+   "dead_tuples": 341672,
+   "horizon_age": 203507
+  },
+  {
+   "round": 27,
+   "table": "plain",
+   "tps": 75.829609,
+   "latency_ms": 9487.852,
+   "failed": 0,
+   "dead_tuples": 416948,
+   "horizon_age": 206084
+  },
+  {
+   "round": 27,
+   "table": "captured",
+   "tps": 58.430348,
+   "latency_ms": 10751.484,
+   "failed": 0,
+   "dead_tuples": 348688,
+   "horizon_age": 208075
+  },
+  {
+   "round": 28,
+   "table": "plain",
+   "tps": 74.284365,
+   "latency_ms": 9673.567,
+   "failed": 0,
+   "dead_tuples": 425856,
+   "horizon_age": 210606
+  },
+  {
+   "round": 28,
+   "table": "captured",
+   "tps": 56.860708,
+   "latency_ms": 10631.896,
+   "failed": 0,
+   "dead_tuples": 355512,
+   "horizon_age": 212549
+  },
+  {
+   "round": 29,
+   "table": "plain",
+   "tps": 72.626132,
+   "latency_ms": 9535.274,
+   "failed": 0,
+   "dead_tuples": 434576,
+   "horizon_age": 215028
+  },
+  {
+   "round": 29,
+   "table": "captured",
+   "tps": 55.522673,
+   "latency_ms": 10688.905,
+   "failed": 0,
+   "dead_tuples": 362176,
+   "horizon_age": 216933
+  },
+  {
+   "round": 30,
+   "table": "plain",
+   "tps": 71.218077,
+   "latency_ms": 9678.599,
+   "failed": 0,
+   "dead_tuples": 443104,
+   "horizon_age": 219370
+  },
+  {
+   "round": 30,
+   "table": "captured",
+   "tps": 54.791022,
+   "latency_ms": 10852.422,
+   "failed": 0,
+   "dead_tuples": 368756,
+   "horizon_age": 221252
+  },
+  {
+   "round": 31,
+   "table": "plain",
+   "tps": 69.713034,
+   "latency_ms": 9776.988,
+   "failed": 0,
+   "dead_tuples": 451444,
+   "horizon_age": 223644
+  },
+  {
+   "round": 31,
+   "table": "captured",
+   "tps": 52.721447,
+   "latency_ms": 10798.29,
+   "failed": 0,
+   "dead_tuples": 375088,
+   "horizon_age": 225460
+  },
+  {
+   "round": 32,
+   "table": "plain",
+   "tps": 64.887451,
+   "latency_ms": 10059.529,
+   "failed": 0,
+   "dead_tuples": 459216,
+   "horizon_age": 227709
+  },
+  {
+   "round": 32,
+   "table": "captured",
+   "tps": 50.266951,
+   "latency_ms": 11244.669,
+   "failed": 0,
+   "dead_tuples": 381124,
+   "horizon_age": 229446
+  },
+  {
+   "round": 33,
+   "table": "plain",
+   "tps": 63.406701,
+   "latency_ms": 10129.149,
+   "failed": 0,
+   "dead_tuples": 466812,
+   "horizon_age": 231649
+  },
+  {
+   "round": 33,
+   "table": "captured",
+   "tps": 48.496845,
+   "latency_ms": 11630.555,
+   "failed": 0,
+   "dead_tuples": 386960,
+   "horizon_age": 233338
+  },
+  {
+   "round": 34,
+   "table": "plain",
+   "tps": 65.308823,
+   "latency_ms": 10032.594,
+   "failed": 0,
+   "dead_tuples": 474636,
+   "horizon_age": 235598
+  },
+  {
+   "round": 34,
+   "table": "captured",
+   "tps": 49.920018,
+   "latency_ms": 11229.284,
+   "failed": 0,
+   "dead_tuples": 392952,
+   "horizon_age": 237327
+  },
+  {
+   "round": 35,
+   "table": "plain",
+   "tps": 64.471087,
+   "latency_ms": 10367.76,
+   "failed": 0,
+   "dead_tuples": 482372,
+   "horizon_age": 239561
+  },
+  {
+   "round": 35,
+   "table": "captured",
+   "tps": 48.967582,
+   "latency_ms": 11271.736,
+   "failed": 0,
+   "dead_tuples": 398832,
+   "horizon_age": 241264
+  },
+  {
+   "round": 36,
+   "table": "plain",
+   "tps": 61.212996,
+   "latency_ms": 10579.537,
+   "failed": 0,
+   "dead_tuples": 489680,
+   "horizon_age": 243399
+  },
+  {
+   "round": 36,
+   "table": "captured",
+   "tps": 48.959285,
+   "latency_ms": 11365.039,
+   "failed": 0,
+   "dead_tuples": 404708,
+   "horizon_age": 245087
+  },
+  {
+   "round": 37,
+   "table": "plain",
+   "tps": 63.269098,
+   "latency_ms": 10183.21,
+   "failed": 0,
+   "dead_tuples": 497292,
+   "horizon_age": 247284
+  },
+  {
+   "round": 37,
+   "table": "captured",
+   "tps": 48.427921,
+   "latency_ms": 11122.155,
+   "failed": 0,
+   "dead_tuples": 410520,
+   "horizon_age": 248964
+  },
+  {
+   "round": 38,
+   "table": "plain",
+   "tps": 61.882961,
+   "latency_ms": 10435.429,
+   "failed": 0,
+   "dead_tuples": 504704,
+   "horizon_age": 251123
+  },
+  {
+   "round": 38,
+   "table": "captured",
+   "tps": 47.227181,
+   "latency_ms": 11592.476,
+   "failed": 0,
+   "dead_tuples": 416188,
+   "horizon_age": 252762
+  },
+  {
+   "round": 39,
+   "table": "plain",
+   "tps": 57.872385,
+   "latency_ms": 10532.201,
+   "failed": 0,
+   "dead_tuples": 511652,
+   "horizon_age": 254798
+  },
+  {
+   "round": 39,
+   "table": "captured",
+   "tps": 44.582912,
+   "latency_ms": 11498.609,
+   "failed": 0,
+   "dead_tuples": 421552,
+   "horizon_age": 256367
+  },
+  {
+   "round": 40,
+   "table": "plain",
+   "tps": 57.713336,
+   "latency_ms": 10637.073,
+   "failed": 0,
+   "dead_tuples": 518768,
+   "horizon_age": 258398
+  },
+  {
+   "round": 40,
+   "table": "captured",
+   "tps": 43.585925,
+   "latency_ms": 11647.904,
+   "failed": 0,
+   "dead_tuples": 426788,
+   "horizon_age": 259929
+  }
+ ]
+}

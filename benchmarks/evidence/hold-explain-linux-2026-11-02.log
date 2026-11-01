@@ -1,0 +1,301 @@
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 21.5M  100 21.5M    0     0  62.1M      0 --:--:-- --:--:-- --:--:-- 62.2M
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100    90  100    90    0     0   3055      0 --:--:-- --:--:-- --:--:--  3103
+1
+chunk tps=201.849279 latency_ms=5.255 failed=0
+=== horizon_age=6526
+sizes marks=3153920 events=5128192 live_marks=0 live_events=0
+-- 1 head lock and join (FOR NO KEY UPDATE)
+LockRows (actual time=0.037..0.038 rows=1.00 loops=1)
+  Buffers: shared hit=14
+  ->  Nested Loop (actual time=0.025..0.025 rows=1.00 loops=1)
+        Join Filter: (s.epoch = h.tracking_epoch)
+        Buffers: shared hit=13
+        ->  Index Scan using capture_heads_source_relation_epoch_key on capture_heads h (actual time=0.018..0.018 rows=1.00 loops=1)
+              Index Cond: ((source_relation = '16725'::oid) AND (epoch = 1))
+              Filter: (row_trigger = '16732'::oid)
+              Index Searches: 1
+              Buffers: shared hit=11
+        ->  Index Scan using tracked_sources_pkey on tracked_sources s (actual time=0.006..0.006 rows=1.00 loops=1)
+              Index Cond: (source_relation = '16725'::oid)
+              Index Searches: 1
+              Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=166
+Planning Time: 0.244 ms
+Execution Time: 0.058 ms
+-- 2 newest mark above the floor (position)
+Limit (actual time=0.008..0.008 rows=0.00 loops=1)
+  Buffers: shared hit=2
+  ->  Index Scan Backward using capture_marks_pkey on capture_marks (actual time=0.007..0.007 rows=0.00 loops=1)
+        Index Cond: ((epoch = 1) AND (ordinal > 36330))
+        Index Searches: 1
+        Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=46
+Planning Time: 0.065 ms
+Execution Time: 0.013 ms
+-- 3 binding lookup (current_configuration)
+Limit (actual time=0.001..0.002 rows=1.00 loops=1)
+  Buffers: shared hit=2
+  ->  Index Scan Backward using capture_bindings_source_relation_epoch_key on capture_bindings (actual time=0.001..0.001 rows=1.00 loops=1)
+        Index Cond: (source_relation = '16725'::oid)
+        Index Searches: 1
+        Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=63
+Planning Time: 0.069 ms
+Execution Time: 0.005 ms
+-- 4 tracked source lookup (current_configuration)
+Index Scan using tracked_sources_pkey on tracked_sources (actual time=0.002..0.002 rows=1.00 loops=1)
+  Index Cond: (source_relation = '16725'::oid)
+  Index Searches: 1
+  Buffers: shared hit=2
+Planning Time: 0.014 ms
+Execution Time: 0.005 ms
+-- 5 event and mark insert (rolled back)
+Aggregate (actual time=0.129..0.130 rows=1.00 loops=1)
+  Buffers: shared hit=35
+  CTE inserted
+    ->  Insert on capture_events (actual time=0.120..0.121 rows=1.00 loops=1)
+          Buffers: shared hit=35
+          ->  Function Scan on e (actual time=0.022..0.022 rows=1.00 loops=1)
+  CTE marked
+    ->  Insert on capture_marks (actual time=0.026..0.026 rows=0.00 loops=1)
+          Buffers: shared hit=12
+          ->  Result (actual time=0.000..0.000 rows=1.00 loops=1)
+  ->  CTE Scan on inserted (actual time=0.121..0.122 rows=1.00 loops=1)
+        Storage: Memory  Maximum Storage: 17kB
+        Buffers: shared hit=35
+Planning:
+  Buffers: shared hit=8
+Planning Time: 0.073 ms
+Trigger for constraint capture_events_source_relation_epoch_fkey on capture_events: time=0.126 calls=1
+Trigger for constraint capture_marks_source_relation_epoch_fkey on capture_marks: time=0.035 calls=1
+Execution Time: 0.354 ms
+chunk tps=197.700020 latency_ms=5.478 failed=0
+chunk tps=198.251930 latency_ms=5.487 failed=0
+chunk tps=201.976126 latency_ms=7.516 failed=0
+chunk tps=199.463023 latency_ms=9.516 failed=0
+=== horizon_age=32758
+sizes marks=15351808 events=25190400 live_marks=10 live_events=12
+-- 1 head lock and join (FOR NO KEY UPDATE)
+LockRows (actual time=0.050..0.051 rows=1.00 loops=1)
+  Buffers: shared hit=40
+  ->  Nested Loop (actual time=0.038..0.039 rows=1.00 loops=1)
+        Join Filter: (s.epoch = h.tracking_epoch)
+        Buffers: shared hit=39
+        ->  Index Scan using capture_heads_source_relation_epoch_key on capture_heads h (actual time=0.030..0.031 rows=1.00 loops=1)
+              Index Cond: ((source_relation = '16725'::oid) AND (epoch = 1))
+              Filter: (row_trigger = '16732'::oid)
+              Index Searches: 1
+              Buffers: shared hit=37
+        ->  Index Scan using tracked_sources_pkey on tracked_sources s (actual time=0.007..0.007 rows=1.00 loops=1)
+              Index Cond: (source_relation = '16725'::oid)
+              Index Searches: 1
+              Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=177
+Planning Time: 0.265 ms
+Execution Time: 0.077 ms
+-- 2 newest mark above the floor (position)
+Limit (actual time=0.017..0.018 rows=1.00 loops=1)
+  Buffers: shared hit=4
+  ->  Index Scan Backward using capture_marks_pkey on capture_marks (actual time=0.017..0.017 rows=1.00 loops=1)
+        Index Cond: ((epoch = 1) AND (ordinal > 179850))
+        Index Searches: 1
+        Buffers: shared hit=4
+Planning:
+  Buffers: shared hit=55
+Planning Time: 0.076 ms
+Execution Time: 0.022 ms
+-- 3 binding lookup (current_configuration)
+Limit (actual time=0.003..0.003 rows=1.00 loops=1)
+  Buffers: shared hit=2
+  ->  Index Scan Backward using capture_bindings_source_relation_epoch_key on capture_bindings (actual time=0.002..0.002 rows=1.00 loops=1)
+        Index Cond: (source_relation = '16725'::oid)
+        Index Searches: 1
+        Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=63
+Planning Time: 0.100 ms
+Execution Time: 0.008 ms
+-- 4 tracked source lookup (current_configuration)
+Index Scan using tracked_sources_pkey on tracked_sources (actual time=0.002..0.002 rows=1.00 loops=1)
+  Index Cond: (source_relation = '16725'::oid)
+  Index Searches: 1
+  Buffers: shared hit=2
+Planning Time: 0.013 ms
+Execution Time: 0.004 ms
+-- 5 event and mark insert (rolled back)
+Aggregate (actual time=0.144..0.145 rows=1.00 loops=1)
+  Buffers: shared hit=36
+  CTE inserted
+    ->  Insert on capture_events (actual time=0.141..0.142 rows=1.00 loops=1)
+          Buffers: shared hit=36
+          ->  Function Scan on e (actual time=0.037..0.037 rows=1.00 loops=1)
+  CTE marked
+    ->  Insert on capture_marks (actual time=0.045..0.045 rows=0.00 loops=1)
+          Buffers: shared hit=13
+          ->  Result (actual time=0.000..0.000 rows=1.00 loops=1)
+  ->  CTE Scan on inserted (actual time=0.141..0.142 rows=1.00 loops=1)
+        Storage: Memory  Maximum Storage: 17kB
+        Buffers: shared hit=36
+Planning:
+  Buffers: shared hit=3
+Planning Time: 0.071 ms
+Trigger for constraint capture_events_source_relation_epoch_fkey on capture_events: time=0.145 calls=1
+Trigger for constraint capture_marks_source_relation_epoch_fkey on capture_marks: time=0.047 calls=1
+Execution Time: 0.417 ms
+chunk tps=197.472729 latency_ms=13.501 failed=0
+chunk tps=200.226868 latency_ms=18.882 failed=0
+chunk tps=193.377620 latency_ms=24.126 failed=0
+chunk tps=195.955250 latency_ms=49.711 failed=0
+chunk tps=194.800675 latency_ms=199.829 failed=0
+=== horizon_age=65127
+sizes marks=30384128 events=49790976 live_marks=60 live_events=72
+-- 1 head lock and join (FOR NO KEY UPDATE)
+LockRows (actual time=0.125..0.126 rows=1.00 loops=1)
+  Buffers: shared hit=75
+  ->  Nested Loop (actual time=0.106..0.107 rows=1.00 loops=1)
+        Join Filter: (s.epoch = h.tracking_epoch)
+        Buffers: shared hit=74
+        ->  Index Scan using capture_heads_source_relation_epoch_key on capture_heads h (actual time=0.096..0.097 rows=1.00 loops=1)
+              Index Cond: ((source_relation = '16725'::oid) AND (epoch = 1))
+              Filter: (row_trigger = '16732'::oid)
+              Index Searches: 1
+              Buffers: shared hit=72
+        ->  Index Scan using tracked_sources_pkey on tracked_sources s (actual time=0.008..0.008 rows=1.00 loops=1)
+              Index Cond: (source_relation = '16725'::oid)
+              Index Searches: 1
+              Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=183
+Planning Time: 0.407 ms
+Execution Time: 0.156 ms
+-- 2 newest mark above the floor (position)
+Limit (actual time=0.024..0.025 rows=1.00 loops=1)
+  Buffers: shared hit=4
+  ->  Index Scan Backward using capture_marks_pkey on capture_marks (actual time=0.023..0.023 rows=1.00 loops=1)
+        Index Cond: ((epoch = 1) AND (ordinal > 356544))
+        Index Searches: 1
+        Buffers: shared hit=4
+Planning:
+  Buffers: shared hit=61
+Planning Time: 0.165 ms
+Execution Time: 0.033 ms
+-- 3 binding lookup (current_configuration)
+Limit (actual time=0.003..0.003 rows=1.00 loops=1)
+  Buffers: shared hit=2
+  ->  Index Scan Backward using capture_bindings_source_relation_epoch_key on capture_bindings (actual time=0.002..0.002 rows=1.00 loops=1)
+        Index Cond: (source_relation = '16725'::oid)
+        Index Searches: 1
+        Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=63
+Planning Time: 0.107 ms
+Execution Time: 0.008 ms
+-- 4 tracked source lookup (current_configuration)
+Index Scan using tracked_sources_pkey on tracked_sources (actual time=0.002..0.003 rows=1.00 loops=1)
+  Index Cond: (source_relation = '16725'::oid)
+  Index Searches: 1
+  Buffers: shared hit=2
+Planning Time: 0.019 ms
+Execution Time: 0.006 ms
+-- 5 event and mark insert (rolled back)
+Aggregate (actual time=0.152..0.153 rows=1.00 loops=1)
+  Buffers: shared hit=37
+  CTE inserted
+    ->  Insert on capture_events (actual time=0.149..0.150 rows=1.00 loops=1)
+          Buffers: shared hit=37
+          ->  Function Scan on e (actual time=0.034..0.034 rows=1.00 loops=1)
+  CTE marked
+    ->  Insert on capture_marks (actual time=0.044..0.044 rows=0.00 loops=1)
+          Buffers: shared hit=14
+          ->  Result (actual time=0.000..0.000 rows=1.00 loops=1)
+  ->  CTE Scan on inserted (actual time=0.150..0.151 rows=1.00 loops=1)
+        Storage: Memory  Maximum Storage: 17kB
+        Buffers: shared hit=37
+Planning:
+  Buffers: shared hit=3
+Planning Time: 0.067 ms
+Trigger for constraint capture_events_source_relation_epoch_fkey on capture_events: time=0.141 calls=1
+Trigger for constraint capture_marks_source_relation_epoch_fkey on capture_marks: time=0.036 calls=1
+Execution Time: 0.409 ms
+chunk tps=187.140854 latency_ms=959.231 failed=0
+chunk tps=173.582850 latency_ms=1812.171 failed=0
+chunk tps=160.924746 latency_ms=2701.831 failed=0
+=== horizon_age=82520
+sizes marks=38486016 events=63045632 live_marks=90 live_events=108
+-- 1 head lock and join (FOR NO KEY UPDATE)
+LockRows (actual time=0.158..0.160 rows=1.00 loops=1)
+  Buffers: shared hit=95
+  ->  Nested Loop (actual time=0.141..0.142 rows=1.00 loops=1)
+        Join Filter: (s.epoch = h.tracking_epoch)
+        Buffers: shared hit=94
+        ->  Index Scan using capture_heads_source_relation_epoch_key on capture_heads h (actual time=0.120..0.121 rows=1.00 loops=1)
+              Index Cond: ((source_relation = '16725'::oid) AND (epoch = 1))
+              Filter: (row_trigger = '16732'::oid)
+              Index Searches: 1
+              Buffers: shared hit=92
+        ->  Index Scan using tracked_sources_pkey on tracked_sources s (actual time=0.018..0.018 rows=1.00 loops=1)
+              Index Cond: (source_relation = '16725'::oid)
+              Index Searches: 1
+              Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=189
+Planning Time: 0.423 ms
+Execution Time: 0.192 ms
+-- 2 newest mark above the floor (position)
+Limit (actual time=0.014..0.014 rows=0.00 loops=1)
+  Buffers: shared hit=3
+  ->  Index Scan Backward using capture_marks_pkey on capture_marks (actual time=0.013..0.013 rows=0.00 loops=1)
+        Index Cond: ((epoch = 1) AND (ordinal > 450534))
+        Index Searches: 1
+        Buffers: shared hit=3
+Planning:
+  Buffers: shared hit=67
+Planning Time: 0.106 ms
+Execution Time: 0.019 ms
+-- 3 binding lookup (current_configuration)
+Limit (actual time=0.002..0.003 rows=1.00 loops=1)
+  Buffers: shared hit=2
+  ->  Index Scan Backward using capture_bindings_source_relation_epoch_key on capture_bindings (actual time=0.002..0.002 rows=1.00 loops=1)
+        Index Cond: (source_relation = '16725'::oid)
+        Index Searches: 1
+        Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=63
+Planning Time: 0.097 ms
+Execution Time: 0.007 ms
+-- 4 tracked source lookup (current_configuration)
+Index Scan using tracked_sources_pkey on tracked_sources (actual time=0.002..0.003 rows=1.00 loops=1)
+  Index Cond: (source_relation = '16725'::oid)
+  Index Searches: 1
+  Buffers: shared hit=2
+Planning Time: 0.016 ms
+Execution Time: 0.006 ms
+-- 5 event and mark insert (rolled back)
+Aggregate (actual time=0.141..0.141 rows=1.00 loops=1)
+  Buffers: shared hit=37
+  CTE inserted
+    ->  Insert on capture_events (actual time=0.138..0.139 rows=1.00 loops=1)
+          Buffers: shared hit=37
+          ->  Function Scan on e (actual time=0.038..0.038 rows=1.00 loops=1)
+  CTE marked
+    ->  Insert on capture_marks (actual time=0.040..0.040 rows=0.00 loops=1)
+          Buffers: shared hit=14
+          ->  Result (actual time=0.000..0.000 rows=1.00 loops=1)
+  ->  CTE Scan on inserted (actual time=0.138..0.139 rows=1.00 loops=1)
+        Storage: Memory  Maximum Storage: 17kB
+        Buffers: shared hit=37
+Planning:
+  Buffers: shared hit=3
+Planning Time: 0.065 ms
+Trigger for constraint capture_events_source_relation_epoch_fkey on capture_events: time=0.135 calls=1
+Trigger for constraint capture_marks_source_relation_epoch_fkey on capture_marks: time=0.060 calls=1
+Execution Time: 0.410 ms
+work dir /home/runner/work/syntradb/syntradb/target/hold-explain/20261101-172718-18529

@@ -1,0 +1,70 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cpu-clock:u'
+# Event count (approx.): 10010049000
+#
+# Overhead  Shared Object  Symbol  IPC  [IPC Coverage]
+# ........  ....................  ..............................................................................................................................................................................................................................................................  ....................
+#
+  5.57%  postgres  [.] palloc0
+  3.61%  postgres  [.] AllocSetAlloc
+  3.36%  postgres  [.] base_yyparse
+  2.66%  postgres  [.] heap_hot_search_buffer
+  2.01%  postgres  [.] heapam_index_fetch_tuple
+  1.91%  postgres  [.] SearchCatCacheInternal
+  1.86%  postgres  [.] hash_search_with_hash_value
+  1.76%  postgres  [.] hash_bytes
+  1.61%  postgres  [.] AllocSetFree
+  1.41%  postgres  [.] StartReadBuffer
+  1.41%  postgres  [.] expression_tree_walker_impl
+  1.36%  postgres  [.] LWLockAttemptLock
+  1.31%  postgres  [.] LWLockRelease
+  1.20%  postgres  [.] ResourceOwnerForget
+  1.15%  postgres  [.] HeapTupleSatisfiesVisibility
+  1.10%  postgres  [.] GlobalVisTestFor
+  1.10%  postgres  [.] core_yylex
+  1.00%  postgres  [.] GlobalVisTestIsRemovableXid
+  0.95%  postgres  [.] GetPrivateRefCountEntry
+  0.90%  postgres  [.] LWLockAcquire
+  0.90%  postgres  [.] check_stack_depth
+  0.80%  postgres  [.] PinBuffer
+  0.80%  postgres  [.] ReleaseAndReadBuffer
+  0.75%  postgres  [.] _bt_check_compare
+  0.70%  postgres  [.] HeapTupleIsSurelyDead
+  0.65%  postgres  [.] LockBuffer
+  0.65%  postgres  [.] UnpinBufferNoOwner
+  0.60%  postgres  [.] XidInMVCCSnapshot
+  0.60%  postgres  [.] _bt_doinsert
+  0.60%  postgres  [.] expression_tree_mutator_impl
+  0.50%  postgres  [.] FunctionCall2Coll
+  0.50%  postgres  [.] ResourceOwnerRemember
+  0.50%  postgres  [.] copyObjectImpl
+  0.50%  postgres  [.] heap_page_prune_opt
+  0.45%  postgres  [.] LockAcquireExtended
+  0.45%  postgres  [.] MakeTupleTableSlot
+  0.45%  postgres  [.] ScanKeywordLookup
+  0.45%  postgres  [.] _bt_first
+  0.45%  postgres  [.] exprType
+  0.45%  postgres  [.] exprTypmod
+  0.45%  postgres  [.] pg_strtok
+  0.45%  postgres  [.] table_index_fetch_tuple_check
+  0.40%  postgres  [.] LockRelease
+  0.40%  syntradb.so  [.] <syntradb::native_catalog::CatalogScan>::open
+  0.40%  syntradb.so  [.] core::str::converts::from_utf8
+  0.35%  postgres  [.] CheckExprStillValid
+  0.35%  postgres  [.] ResourceOwnerEnlarge
+  0.35%  postgres  [.] _bt_checkkeys
+  0.35%  postgres  [.] _bt_preprocess_keys
+  0.35%  postgres  [.] _bt_readpage
+  0.35%  postgres  [.] tts_buffer_heap_init
+  0.30%  postgres  [.] ExecInitExprRec
+  0.30%  postgres  [.] _bt_next
+  0.30%  postgres  [.] eval_const_expressions_mutator
+  0.30%  postgres  [.] heapam_index_fetch_begin
+  0.30%  postgres  [.] index_fetch_heap
+  0.30%  postgres  [.] index_getnext_tid
+  0.30%  postgres  [.] lappend
+  0.30%  postgres  [.] nocachegetattr

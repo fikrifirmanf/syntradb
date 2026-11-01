@@ -13,6 +13,7 @@ on:
         options:
           - '40'
           - '20'
+          - '8'
           - '2'
         default: '40'
       seconds:
@@ -29,6 +30,25 @@ on:
           - '200'
           - '100'
         default: '200'
+      clients:
+        description: pgbench clients per run (1 removes writer-against-writer lock queueing)
+        type: choice
+        options:
+          - '2'
+          - '1'
+        default: '2'
+      profile_rounds:
+        description: Space-separated rounds to CPU-profile with perf (empty for none); adds overhead
+        type: string
+        default: ''
+      explain_targets:
+        description: If set (for example '1000 30000 60000 80000'), run hold-explain.sh at these horizon ages instead of the control
+        type: string
+        default: ''
+      diag:
+        description: Sample wait events and print per-table statistics each round (adds measurement overhead)
+        type: boolean
+        default: false
       shape:
         description: transfer (two updates) or cycle (adds the soak writer's insert, move and delete)
         type: choice
@@ -57,6 +77,10 @@ jobs:
       SECONDS_PER_ROUND: ${{ inputs.seconds }}
       RATE: ${{ inputs.rate }}
       SHAPE: ${{ inputs.shape }}
+      CLIENTS: ${{ inputs.clients }}
+      PROFILE_ROUNDS: ${{ inputs.profile_rounds }}
+      EXPLAIN_TARGETS: ${{ inputs.explain_targets }}
+      DIAG: ${{ inputs.diag && '1' || '0' }}
       CARGO_TERM_COLOR: never
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,16 +97,37 @@ jobs:
             free -h
             printf 'Runner image: %s %s\n' "$ImageOS" "$ImageVersion"
             printf 'Run: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
-            printf 'rounds=%s seconds=%s rate=%s shape=%s\n' "$ROUNDS" "$SECONDS_PER_ROUND" "$RATE" "$SHAPE"
+            printf 'rounds=%s seconds=%s rate=%s shape=%s clients=%s\n' "$ROUNDS" "$SECONDS_PER_ROUND" "$RATE" "$SHAPE" "$CLIENTS"
           } 2>&1 | tee benchmarks/results/actions/environment.txt
       - name: Install PostgreSQL build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config libicu-dev libreadline-dev zlib1g-dev libssl-dev libclang-dev clang bison flex
+      - name: Install Linux profiler
+        if: inputs.profile_rounds != ''
+        run: |
+          sudo apt-get install -y linux-tools-generic ripgrep
+          roots=()
+          for root in /usr/lib/linux-tools*; do
+            if [[ -d "$root" ]]; then roots+=("$root"); fi
+          done
+          [[ ${#roots[@]} -gt 0 ]] || { echo 'No Linux tools directories installed' >&2; exit 1; }
+          perf_bin="$(rg --files --follow --hidden --no-ignore "${roots[@]}" -g perf | sort -Vu | tail -n 1)"
+          [[ -x "$perf_bin" ]] || { echo 'No perf executable installed' >&2; exit 1; }
+          printf 'PERF_BIN=%s\n' "$perf_bin" >> "$GITHUB_ENV"
+          "$perf_bin" version
+          sudo sysctl kernel.perf_event_paranoid=-1 kernel.kptr_restrict=0 || true
       - name: Build project-local PostgreSQL and pgrx
         timeout-minutes: 90
         run: bash scripts/setup.sh 2>&1 | tee benchmarks/results/actions/setup.log
+      - name: Run per-statement EXPLAIN at chosen horizon ages
+        if: inputs.explain_targets != ''
+        timeout-minutes: 120
+        run: |
+          bash benchmarks/scripts/hold-explain.sh "$EXPLAIN_TARGETS" "$CLIENTS" \
+            2>&1 | tee benchmarks/results/actions/hold-explain.log
       - name: Run held-snapshot control
+        if: inputs.explain_targets == ''
         timeout-minutes: 120
         run: |
           vmstat -t 60 > benchmarks/results/actions/load.log &
@@ -91,7 +136,7 @@ jobs:
           bash benchmarks/scripts/hold-control.sh "$ROUNDS" "$SECONDS_PER_ROUND" "$RATE" "$SHAPE" \
             2>&1 | tee benchmarks/results/actions/hold-control.log
       - name: Summarize captured against plain
-        if: always()
+        if: always() && inputs.explain_targets == ''
         run: |
           python3 - <<'PY' | tee benchmarks/results/actions/summary.txt
           from pathlib import Path
