@@ -50,8 +50,110 @@ pub fn group_owned_int8<K: Eq + Hash + Ord>(
     max_groups: usize,
     max_key_bytes: usize,
     key_bytes: impl Fn(&K) -> usize,
-    mut keep_running: impl FnMut() -> bool,
+    keep_running: impl FnMut() -> bool,
 ) -> Result<Vec<GroupedSummary<K, Int8Summary>>, GroupingError> {
+    group_owned(
+        input,
+        max_groups,
+        max_key_bytes,
+        key_bytes,
+        keep_running,
+        Int8Summary::push,
+    )
+}
+
+/// Exact scaled decimal input/result; NaN is distinct from SQL NULL.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecimalResult<T> {
+    Null,
+    Finite(T),
+    NaN,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct DecimalSummary {
+    finite: Int8Summary,
+    nans: i64,
+}
+
+impl DecimalSummary {
+    pub fn push(&mut self, value: DecimalResult<i64>) -> Result<(), AggregateError> {
+        match value {
+            DecimalResult::Null => self.finite.push(None),
+            DecimalResult::Finite(v) => self.finite.push(Some(v)),
+            DecimalResult::NaN => {
+                let nans = self
+                    .nans
+                    .checked_add(1)
+                    .ok_or(AggregateError::CountOverflow)?;
+                self.finite.push(None)?;
+                self.nans = nans;
+                Ok(())
+            }
+        }
+    }
+    pub fn rows(&self) -> i64 {
+        self.finite.rows()
+    }
+    pub fn non_nulls(&self) -> i64 {
+        self.finite.non_nulls() + self.nans
+    }
+    pub fn sum(&self) -> DecimalResult<i128> {
+        if self.nans > 0 {
+            DecimalResult::NaN
+        } else {
+            self.finite
+                .sum()
+                .map_or(DecimalResult::Null, DecimalResult::Finite)
+        }
+    }
+    pub fn min(&self) -> DecimalResult<i64> {
+        self.finite.min().map_or(
+            if self.nans > 0 {
+                DecimalResult::NaN
+            } else {
+                DecimalResult::Null
+            },
+            DecimalResult::Finite,
+        )
+    }
+    pub fn max(&self) -> DecimalResult<i64> {
+        if self.nans > 0 {
+            DecimalResult::NaN
+        } else {
+            self.finite
+                .max()
+                .map_or(DecimalResult::Null, DecimalResult::Finite)
+        }
+    }
+}
+
+/// All inputs share one fixed scale, validated by the PostgreSQL adapter.
+pub fn group_owned_decimal<K: Eq + Hash + Ord>(
+    input: impl IntoIterator<Item = (Option<K>, DecimalResult<i64>)>,
+    max_groups: usize,
+    max_key_bytes: usize,
+    key_bytes: impl Fn(&K) -> usize,
+    keep_running: impl FnMut() -> bool,
+) -> Result<Vec<GroupedSummary<K, DecimalSummary>>, GroupingError> {
+    group_owned(
+        input,
+        max_groups,
+        max_key_bytes,
+        key_bytes,
+        keep_running,
+        DecimalSummary::push,
+    )
+}
+
+fn group_owned<K: Eq + Hash + Ord, V, S: Default>(
+    input: impl IntoIterator<Item = (Option<K>, V)>,
+    max_groups: usize,
+    max_key_bytes: usize,
+    key_bytes: impl Fn(&K) -> usize,
+    mut keep_running: impl FnMut() -> bool,
+    push: fn(&mut S, V) -> Result<(), AggregateError>,
+) -> Result<Vec<GroupedSummary<K, S>>, GroupingError> {
     if !(1..=MAX_GROUPS).contains(&max_groups) {
         return Err(GroupingError::InvalidLimit);
     }
@@ -66,7 +168,7 @@ pub fn group_owned_int8<K: Eq + Hash + Ord>(
         }
     };
     poll()?;
-    let mut groups: HashMap<Option<K>, Int8Summary> = HashMap::new();
+    let mut groups: HashMap<Option<K>, S> = HashMap::new();
     groups
         .try_reserve(max_groups)
         .map_err(|_| GroupingError::AllocationFailed)?;
@@ -75,7 +177,7 @@ pub fn group_owned_int8<K: Eq + Hash + Ord>(
         // Keys can be large, so poll every input rather than every 1024 rows.
         poll()?;
         if let Some(summary) = groups.get_mut(&key) {
-            summary.push(value).map_err(GroupingError::Aggregate)?;
+            push(summary, value).map_err(GroupingError::Aggregate)?;
             continue;
         }
         if groups.len() == max_groups {
@@ -87,8 +189,8 @@ pub fn group_owned_int8<K: Eq + Hash + Ord>(
             .ok_or(GroupingError::KeyBytesLimitExceeded {
                 limit: max_key_bytes,
             })?;
-        let mut summary = Int8Summary::default();
-        summary.push(value).map_err(GroupingError::Aggregate)?;
+        let mut summary = S::default();
+        push(&mut summary, value).map_err(GroupingError::Aggregate)?;
         groups.insert(key, summary);
     }
     poll()?;

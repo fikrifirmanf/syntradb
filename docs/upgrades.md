@@ -456,6 +456,22 @@ atomic dependency refusal and catalog equality with fresh installs. The
 [verification record](verification-0.10.0.md) distinguishes local results from
 passing native Linux checks.
 
+## 0.11.0 to 0.12.0
+
+0.12.0 adds three [decimal grouping functions](grouped-decimal-measures.md).
+The update changes no captured data or checkpoint format. Install the new
+library and SQL assets, then run `ALTER EXTENSION syntradb UPDATE TO '0.12.0'`.
+
+To downgrade, run `ALTER EXTENSION syntradb UPDATE TO '0.11.0'` while the new
+library is still installed. Dependent user views block removal atomically.
+Remove those dependencies yourself before retrying. Then stop PostgreSQL,
+restore the 0.11 library and restart it. Existing integer-measure grouping APIs
+remain available. The reverse update restores decimal grouping.
+
+`scripts/downgrade-0.12.0-check.sh` checks both libraries, retained capture history,
+dependent-view refusal and catalog equality against fresh installs. The
+[verification record](verification-0.12.0.md) lists local results and pending CI.
+
 ## 0.10.0 to 0.11.0
 
 0.11.0 adds two [text/UUID grouping functions](text-uuid-grouping.md). It changes

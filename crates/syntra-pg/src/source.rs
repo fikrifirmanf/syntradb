@@ -282,22 +282,7 @@ pub(super) fn group_text(
         &[pg_sys::INT2OID, pg_sys::INT4OID, pg_sys::INT8OID],
         "grouping values must be stored, non-generated int2, int4 or int8 columns",
     );
-    let collation = source
-        .tuple_desc()
-        .iter()
-        .find(|a| a.attnum == key)
-        .map(|a| a.attcollation)
-        .unwrap_or_else(|| unsupported("text key metadata is missing"));
-    // SAFETY: main backend thread, built-in text column checked under the
-    // relation lock. No locale pointer or PostgreSQL datum enters Rust state.
-    unsafe {
-        if pg_sys::GetDatabaseEncoding() != pg_sys::pg_enc::PG_UTF8 as i32 {
-            unsupported("text grouping requires UTF8 database encoding");
-        }
-        if !pg_sys::get_collation_isdeterministic(collation) {
-            unsupported("text grouping requires a deterministic source collation");
-        }
-    }
+    validate_text_group_collation(source, key);
     match value_type {
         pg_sys::INT2OID => group_owned_checked::<String, i16>(
             source,
@@ -327,6 +312,25 @@ pub(super) fn group_text(
             String::len,
         ),
         _ => unsupported("unsupported integer value type"),
+    }
+}
+
+fn validate_text_group_collation(source: &PgRelation, key: i16) {
+    let collation = source
+        .tuple_desc()
+        .iter()
+        .find(|a| a.attnum == key)
+        .map(|a| a.attcollation)
+        .unwrap_or_else(|| unsupported("text key metadata is missing"));
+    // SAFETY: main backend thread, built-in text column checked under the
+    // relation lock. No locale pointer or PostgreSQL datum enters Rust state.
+    unsafe {
+        if pg_sys::GetDatabaseEncoding() != pg_sys::pg_enc::PG_UTF8 as i32 {
+            unsupported("text grouping requires UTF8 database encoding");
+        }
+        if !pg_sys::get_collation_isdeterministic(collation) {
+            unsupported("text grouping requires a deterministic source collation");
+        }
     }
 }
 
@@ -403,6 +407,188 @@ struct Provenance {
     command: i64,
     captured_at: TimestampWithTimeZone,
     active_snapshot: pg_sys::Snapshot,
+}
+
+pub(super) type NumericGroups<K> = (
+    Vec<syntra_exec::GroupedSummary<K, syntra_exec::DecimalSummary>>,
+    crate::numeric::Scale,
+);
+
+fn numeric_group_value(source: &PgRelation, value: &str) -> (i16, crate::numeric::Scale) {
+    let attribute = validate_column(
+        source,
+        value,
+        &[pg_sys::NUMERICOID],
+        "decimal grouping requires a stored, non-generated numeric value column",
+    )
+    .0;
+    let typmod = source
+        .tuple_desc()
+        .iter()
+        .find(|a| a.attnum == attribute)
+        .map(|a| a.atttypmod)
+        .unwrap_or(-1);
+    let scale = crate::numeric::from_typmod(typmod).unwrap_or_else(|| {
+        unsupported("decimal grouping requires numeric(p,s) with 1 <= p <= 18 and 0 <= s <= p")
+    });
+    (attribute, scale)
+}
+
+pub(super) fn group_integer_numeric(
+    source: &PgRelation,
+    key: &str,
+    value: &str,
+    groups: usize,
+    bytes: usize,
+) -> Result<NumericGroups<i64>, syntra_exec::GroupingError> {
+    let (key, kind) = validate_column(
+        source,
+        key,
+        &[pg_sys::INT2OID, pg_sys::INT4OID, pg_sys::INT8OID],
+        "decimal integer grouping requires a stored, non-generated integer key",
+    );
+    let (value, scale) = numeric_group_value(source, value);
+    let convert = |rows: Vec<syntra_exec::GroupedSummary<i16, syntra_exec::DecimalSummary>>| {
+        rows.into_iter()
+            .map(|g| syntra_exec::GroupedSummary {
+                key: g.key.map(i64::from),
+                summary: g.summary,
+            })
+            .collect()
+    };
+    let result = match kind {
+        pg_sys::INT2OID => convert(group_numeric_checked::<i16>(
+            source,
+            key,
+            value,
+            groups,
+            bytes,
+            None,
+            |_| 2,
+            scale,
+        )?),
+        pg_sys::INT4OID => {
+            group_numeric_checked::<i32>(source, key, value, groups, bytes, None, |_| 4, scale)?
+                .into_iter()
+                .map(|g| syntra_exec::GroupedSummary {
+                    key: g.key.map(i64::from),
+                    summary: g.summary,
+                })
+                .collect()
+        }
+        pg_sys::INT8OID => {
+            group_numeric_checked::<i64>(source, key, value, groups, bytes, None, |_| 8, scale)?
+        }
+        _ => unsupported("unsupported integer grouping key"),
+    };
+    Ok((result, scale))
+}
+
+pub(super) fn group_text_numeric(
+    source: &PgRelation,
+    key: &str,
+    value: &str,
+    groups: usize,
+    bytes: usize,
+) -> Result<NumericGroups<String>, syntra_exec::GroupingError> {
+    let key = validate_column(
+        source,
+        key,
+        &[pg_sys::TEXTOID],
+        "text grouping requires a stored, non-generated text key",
+    )
+    .0;
+    let (value, scale) = numeric_group_value(source, value);
+    validate_text_group_collation(source, key);
+    Ok((
+        group_numeric_checked::<String>(
+            source,
+            key,
+            value,
+            groups,
+            bytes,
+            Some(bytes),
+            String::len,
+            scale,
+        )?,
+        scale,
+    ))
+}
+
+pub(super) fn group_uuid_numeric(
+    source: &PgRelation,
+    key: &str,
+    value: &str,
+    groups: usize,
+    bytes: usize,
+) -> Result<NumericGroups<pgrx::Uuid>, syntra_exec::GroupingError> {
+    let key = validate_column(
+        source,
+        key,
+        &[pg_sys::UUIDOID],
+        "UUID grouping requires a stored, non-generated uuid key",
+    )
+    .0;
+    let (value, scale) = numeric_group_value(source, value);
+    Ok((
+        group_numeric_checked::<pgrx::Uuid>(
+            source,
+            key,
+            value,
+            groups,
+            bytes,
+            None,
+            |_| 16,
+            scale,
+        )?,
+        scale,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn group_numeric_checked<K: FromDatum + Eq + std::hash::Hash + Ord>(
+    source: &PgRelation,
+    key: i16,
+    value: i16,
+    groups: usize,
+    bytes: usize,
+    text_key_limit: Option<usize>,
+    key_bytes: impl Fn(&K) -> usize,
+    scale: crate::numeric::Scale,
+) -> Result<
+    Vec<syntra_exec::GroupedSummary<K, syntra_exec::DecimalSummary>>,
+    syntra_exec::GroupingError,
+> {
+    let rows = SourcePairs::<K, pgrx::AnyNumeric> {
+        values: SourceScan::new(source, value, heap_snapshot()),
+        key,
+        text_key_limit,
+        _key: PhantomData,
+    };
+    let mut scratch = pgrx::PgMemoryContexts::new("syntradb decimal grouping conversion");
+    let rows = rows.map(|(key, value)| {
+        // SAFETY: scratch is an owned backend context. Only numeric conversion
+        // runs inside it, after tuple/key copies. The result contains owned Rust
+        // integers/enums, never a PostgreSQL pointer. Reset frees numeric_out's
+        // temporary strings each row without invalidating scans or retained keys.
+        let converted = unsafe {
+            let result = scratch.switch_to(|_| match value {
+                None => Ok(syntra_exec::DecimalResult::Null),
+                Some(v) if v.is_nan() => Ok(syntra_exec::DecimalResult::NaN),
+                Some(v) => {
+                    crate::numeric::to_stored(&v, scale).map(syntra_exec::DecimalResult::Finite)
+                }
+            });
+            scratch.reset();
+            result
+        }
+        .unwrap_or_else(|e| unsupported(e));
+        (key, converted)
+    });
+    syntra_exec::group_owned_decimal(rows, groups, bytes, key_bytes, || {
+        pgrx::check_for_interrupts!();
+        true
+    })
 }
 
 // Fresh scans use table_beginscan's SO_TYPE_SEQSCAN contract: heap_beginscan

@@ -12,6 +12,7 @@ rustfmt --edition 2021 --check crates/syntra-pg/src/heap_tests.rs
 rustfmt --edition 2021 --check crates/syntra-pg/src/temporal_tests.rs
 rustfmt --edition 2021 --check crates/syntra-pg/src/grouping_tests.rs
 rustfmt --edition 2021 --check crates/syntra-pg/src/owned_grouping_tests.rs
+rustfmt --edition 2021 --check crates/syntra-pg/src/decimal_grouping_tests.rs
 rustfmt --edition 2021 --check crates/syntra-pg/src/live_tests.rs
 rustfmt --edition 2021 --check crates/syntra-pg/src/capture_tests.rs
 rustfmt --edition 2021 --check crates/syntra-pg/src/checkpoint_tests.rs
