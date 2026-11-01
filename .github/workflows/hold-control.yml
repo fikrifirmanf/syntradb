@@ -29,6 +29,13 @@ on:
           - '200'
           - '100'
         default: '200'
+      clients:
+        description: pgbench clients per run (1 removes writer-against-writer lock queueing)
+        type: choice
+        options:
+          - '2'
+          - '1'
+        default: '2'
       diag:
         description: Sample wait events and print per-table statistics each round (adds measurement overhead)
         type: boolean
@@ -61,6 +68,7 @@ jobs:
       SECONDS_PER_ROUND: ${{ inputs.seconds }}
       RATE: ${{ inputs.rate }}
       SHAPE: ${{ inputs.shape }}
+      CLIENTS: ${{ inputs.clients }}
       DIAG: ${{ inputs.diag && '1' || '0' }}
       CARGO_TERM_COLOR: never
     steps:
@@ -78,7 +86,7 @@ jobs:
             free -h
             printf 'Runner image: %s %s\n' "$ImageOS" "$ImageVersion"
             printf 'Run: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
-            printf 'rounds=%s seconds=%s rate=%s shape=%s\n' "$ROUNDS" "$SECONDS_PER_ROUND" "$RATE" "$SHAPE"
+            printf 'rounds=%s seconds=%s rate=%s shape=%s clients=%s\n' "$ROUNDS" "$SECONDS_PER_ROUND" "$RATE" "$SHAPE" "$CLIENTS"
           } 2>&1 | tee benchmarks/results/actions/environment.txt
       - name: Install PostgreSQL build dependencies
         run: |

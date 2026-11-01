@@ -14,6 +14,9 @@ SHAPE="${4:-transfer}"
 # DIAG=1 also samples client wait events during each run and prints per-table
 # statistics after it, to show where a table's time goes as the hold ages.
 DIAG="${DIAG:-0}"
+# CLIENTS is the number of pgbench clients per run (default 2). One client removes
+# writer-against-writer lock queueing from the comparison.
+CLIENTS="${CLIENTS:-2}"
 case "$SHAPE" in transfer | cycle) ;; *) echo "shape must be transfer or cycle" >&2; exit 2 ;; esac
 SYNTRA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$SYNTRA_ROOT"
@@ -81,7 +84,7 @@ for round in $(seq 1 "$ROUNDS"); do
             done) &
             SAMPLER=$!
         fi
-        tps="$("$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c 2 -j 2 -R "$RATE" -T "$SECONDS_PER_ROUND" -f "$WORK/$t.sql" feeds 2>&1 \
+        tps="$("$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c "$CLIENTS" -j "$CLIENTS" -R "$RATE" -T "$SECONDS_PER_ROUND" -f "$WORK/$t.sql" feeds 2>&1 \
             | awk '/^tps = /{tps=$3} /^latency average/{lat=$4} /^number of failed/{fail=$5} END{print tps, lat, fail}')"
         if [[ -n "$SAMPLER" ]]; then
             kill "$SAMPLER" 2>/dev/null || true
