@@ -150,7 +150,7 @@ def verify(bundle, pg_config, scratch, version, expected_fingerprint):
         try:
             run([binary / 'pg_ctl', '-D', data, '-l', scratch / 'postgresql.log', '-w', '-t', '60', 'start'])
             sql = """CREATE EXTENSION syntradb;
-CREATE TABLE package_source(id int4 PRIMARY KEY, v int4,created_at timestamptz DEFAULT '2026-01-01+00',category text DEFAULT 'all',identity uuid DEFAULT '00000000-0000-0000-0000-000000000001');
+CREATE TABLE package_source(id int4 PRIMARY KEY, v int4,created_at timestamptz DEFAULT '2026-01-01+00',category text DEFAULT 'all',identity uuid DEFAULT '00000000-0000-0000-0000-000000000001',n numeric(18,2) DEFAULT 1.25);
 INSERT INTO package_source(id,v) VALUES (1,10),(2,20);
 SELECT syntra_seed_capture('package_source','id','v',64);
 UPDATE package_source SET v=v+1 WHERE id=1;
@@ -160,7 +160,10 @@ SELECT json_build_object('version',syntra_version(),'profile',syntra_build_profi
  'pending',(SELECT pending_events FROM syntra_capture_lag('package_source')),
  'time_sum',(SELECT sum FROM syntra_heap_timestamptz_summary('package_source','v','created_at','2026-01-01+00','2026-01-02+00')),
  'text_group_sum',(SELECT sum(sum) FROM syntra_heap_group_text_summary('package_source','category','v')),
- 'uuid_group_sum',(SELECT sum(sum) FROM syntra_heap_group_uuid_summary('package_source','identity','v')))
+ 'uuid_group_sum',(SELECT sum(sum) FROM syntra_heap_group_uuid_summary('package_source','identity','v')),
+ 'integer_decimal_sum',(SELECT sum(sum) FROM syntra_heap_group_integer_numeric_summary('package_source','id','n')),
+ 'text_decimal_sum',(SELECT sum(sum) FROM syntra_heap_group_text_numeric_summary('package_source','category','n')),
+ 'uuid_decimal_sum',(SELECT sum(sum) FROM syntra_heap_group_uuid_numeric_summary('package_source','identity','n')))
 FROM syntra_checkpoint_int4_summary('package_source','v') AS s;
 BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY;
 SELECT rows,sum FROM syntra_heap_int4_summary('package_source','v');
@@ -173,7 +176,8 @@ COMMIT;
             rows = [json.loads(line) for line in result.stdout.splitlines() if line.startswith('{')]
             expected = {'version': version, 'profile': 'release', 'fingerprint': expected_fingerprint,
                         'rows': 2, 'sum': 31, 'route': 'checkpoint', 'pending': 0, 'time_sum': 31,
-                        'text_group_sum': 31, 'uuid_group_sum': 31}
+                        'text_group_sum': 31, 'uuid_group_sum': 31,
+                        'integer_decimal_sum': 2.5, 'text_decimal_sum': 2.5, 'uuid_decimal_sum': 2.5}
             if rows != [expected] or '\n2|31\n' not in '\n' + result.stdout:
                 raise ValueError('packaged extension failed version, fingerprint, capture, checkpoint or SSI checks')
             return {'status': 'passed', 'checks': expected, 'fresh_heap_ssi': '2|31', 'private_install': True}

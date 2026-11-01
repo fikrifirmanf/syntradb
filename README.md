@@ -15,6 +15,8 @@ Fresh [time-window aggregates](docs/temporal-aggregates.md) filter `date`,
 decimal values. They use explicit SQL functions and the caller's MVCC snapshot.
 Fresh [text and UUID grouping](docs/text-uuid-grouping.md) also supports integer
 measures, with group-count and retained-key-byte limits.
+Fresh [grouped decimal measures](docs/grouped-decimal-measures.md) support integer,
+text and UUID keys with exact fixed-scale sums and PostgreSQL NaN semantics.
 Automatic analytical paths remain unimplemented. The [baseline harness](benchmarks/README.md) compares the prototype
 with PostgreSQL on declared workloads.
 

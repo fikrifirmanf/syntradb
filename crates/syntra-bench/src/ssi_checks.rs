@@ -19,6 +19,9 @@ enum ReadPath {
     Grouping,
     TextGrouping,
     UuidGrouping,
+    IntegerDecimalGrouping,
+    TextDecimalGrouping,
+    UuidDecimalGrouping,
     Date,
     Timestamp,
     Timestamptz,
@@ -34,6 +37,9 @@ impl ReadPath {
             Self::Grouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_integer_summary('ssi_source','k','v')",
             Self::TextGrouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_text_summary('ssi_source','label','v')",
             Self::UuidGrouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_uuid_summary('ssi_source','identity','v')",
+            Self::IntegerDecimalGrouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_integer_numeric_summary('ssi_source','k','n')",
+            Self::TextDecimalGrouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_text_numeric_summary('ssi_source','label','n')",
+            Self::UuidDecimalGrouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_uuid_numeric_summary('ssi_source','identity','n')",
             Self::Date => "SELECT sum::bigint FROM syntra_heap_date_summary('ssi_source','v','d','2026-01-01','2026-01-02') LIMIT 1",
             Self::Timestamp => "SELECT sum::bigint FROM syntra_heap_timestamp_summary('ssi_source','v','t','2026-01-01','2026-01-02') LIMIT 1",
             Self::Timestamptz => "SELECT sum::bigint FROM syntra_heap_timestamptz_summary('ssi_source','v','z','2026-01-01+00','2026-01-02+00') LIMIT 1",
@@ -69,8 +75,8 @@ fn conflict(
         Scenario::WriteSkew => (
             "TRUNCATE ssi_source; INSERT INTO ssi_source VALUES(1,1),(2,1)",
             Some(2),
-            "UPDATE ssi_source SET v=0 WHERE k=1; COMMIT",
-            "UPDATE ssi_source SET v=0 WHERE k=2; COMMIT",
+            "UPDATE ssi_source SET v=0,n=0 WHERE k=1; COMMIT",
+            "UPDATE ssi_source SET v=0,n=0 WHERE k=2; COMMIT",
             "SELECT sum(v)=1 FROM ssi_source",
         ),
         Scenario::EmptyPhantom => (
@@ -136,7 +142,7 @@ fn conflict(
 
 pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     let mut admin = cluster.connect("syntra_enabled")?;
-    admin.batch_execute("CREATE TABLE ssi_source(k int4 PRIMARY KEY,v int4,d date DEFAULT '2026-01-01',t timestamp DEFAULT '2026-01-01',z timestamptz DEFAULT '2026-01-01+00',label text COLLATE \"C\" DEFAULT 'label',identity uuid DEFAULT '00000000-0000-0000-0000-000000000001'); INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
+    admin.batch_execute("CREATE TABLE ssi_source(k int4 PRIMARY KEY,v int4,d date DEFAULT '2026-01-01',t timestamp DEFAULT '2026-01-01',z timestamptz DEFAULT '2026-01-01+00',label text COLLATE \"C\" DEFAULT 'label',identity uuid DEFAULT '00000000-0000-0000-0000-000000000001',n numeric(18,2) DEFAULT 1.00); INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
     let mut reader = cluster.connect("syntra_enabled")?;
     for mode in [
         "BEGIN ISOLATION LEVEL SERIALIZABLE",
@@ -149,6 +155,9 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
             ReadPath::Grouping,
             ReadPath::TextGrouping,
             ReadPath::UuidGrouping,
+            ReadPath::IntegerDecimalGrouping,
+            ReadPath::TextDecimalGrouping,
+            ReadPath::UuidDecimalGrouping,
             ReadPath::Date,
             ReadPath::Timestamp,
             ReadPath::Timestamptz,
@@ -176,6 +185,9 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         ReadPath::Grouping,
         ReadPath::TextGrouping,
         ReadPath::UuidGrouping,
+        ReadPath::IntegerDecimalGrouping,
+        ReadPath::TextDecimalGrouping,
+        ReadPath::UuidDecimalGrouping,
         ReadPath::Date,
         ReadPath::Timestamp,
         ReadPath::Timestamptz,
@@ -213,6 +225,9 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         ReadPath::Grouping,
         ReadPath::TextGrouping,
         ReadPath::UuidGrouping,
+        ReadPath::IntegerDecimalGrouping,
+        ReadPath::TextDecimalGrouping,
+        ReadPath::UuidDecimalGrouping,
         ReadPath::Date,
         ReadPath::Timestamp,
         ReadPath::Timestamptz,
@@ -233,7 +248,7 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
             "BEGIN ISOLATION LEVEL SERIALIZABLE; UPDATE ssi_pivot_input SET v=2 WHERE k=1",
         )?;
         outgoing.batch_execute(
-            "BEGIN ISOLATION LEVEL SERIALIZABLE; UPDATE ssi_source SET v=2 WHERE k=1; COMMIT",
+            "BEGIN ISOLATION LEVEL SERIALIZABLE; UPDATE ssi_source SET v=2,n=2 WHERE k=1; COMMIT",
         )?;
         let aborted = pivot
             .query_one(path.sql(), &[])
@@ -314,10 +329,27 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         require(reader.query_one(sql,&[])?.try_get::<_,String>(0)?==changed,"owned grouping fresh snapshot missed changed keys")?;
     }
 
-    admin.batch_execute("CREATE TABLE owned_cancel(k text,u uuid,v int4); INSERT INTO owned_cancel SELECT 'same','00000000-0000-0000-0000-000000000001',g FROM generate_series(1,1000000) g")?;
+    for (sql, initial, changed) in [
+        ("SELECT string_agg(group_key::text||':'||sum::text,',' ORDER BY group_key) FROM syntra_heap_group_integer_numeric_summary('ssi_source','k','n')", "1:1.00,2:1.00", "2:1.00,3:7.25"),
+        ("SELECT string_agg(group_key||':'||sum::text,',' ORDER BY group_key) FROM syntra_heap_group_text_numeric_summary('ssi_source','label','n')", "label:2.00", "label:1.00,moved:7.25"),
+        ("SELECT string_agg(group_key::text||':'||sum::text,',' ORDER BY group_key) FROM syntra_heap_group_uuid_numeric_summary('ssi_source','identity','n')", "00000000-0000-0000-0000-000000000001:2.00", "00000000-0000-0000-0000-000000000001:1.00,00000000-0000-0000-0000-000000000002:7.25"),
+    ] {
+        admin.batch_execute("TRUNCATE ssi_source; INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
+        reader.batch_execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")?;
+        require(reader.query_one(sql,&[])?.try_get::<_,String>(0)?==initial,"decimal grouping initial snapshot changed")?;
+        admin.batch_execute("UPDATE ssi_source SET k=3,n=7.25,label='moved',identity='00000000-0000-0000-0000-000000000002' WHERE k=1")?;
+        require(reader.query_one(sql,&[])?.try_get::<_,String>(0)?==initial,"decimal grouping mixed old and new key/value versions")?;
+        reader.batch_execute("COMMIT")?;
+        require(reader.query_one(sql,&[])?.try_get::<_,String>(0)?==changed,"decimal grouping fresh snapshot missed changed keys or scale")?;
+    }
+
+    admin.batch_execute("CREATE TABLE owned_cancel(k text,u uuid,v int4,n numeric(18,2),i int4); INSERT INTO owned_cancel SELECT 'same','00000000-0000-0000-0000-000000000001',g,g::numeric/100,1 FROM generate_series(1,1000000) g")?;
     for (cancel_sql,reuse_sql) in [
         ("SELECT group_key FROM syntra_heap_group_text_summary('owned_cancel','k','v')", "SELECT rows=1000000 AND sum=500000500000 FROM syntra_heap_group_text_summary('owned_cancel','k','v')"),
         ("SELECT group_key FROM syntra_heap_group_uuid_summary('owned_cancel','u','v')", "SELECT rows=1000000 AND sum=500000500000 FROM syntra_heap_group_uuid_summary('owned_cancel','u','v')"),
+        ("SELECT group_key FROM syntra_heap_group_integer_numeric_summary('owned_cancel','i','n')", "SELECT rows=1000000 AND sum=5000005000.00 FROM syntra_heap_group_integer_numeric_summary('owned_cancel','i','n')"),
+        ("SELECT group_key FROM syntra_heap_group_text_numeric_summary('owned_cancel','k','n')", "SELECT rows=1000000 AND sum=5000005000.00 FROM syntra_heap_group_text_numeric_summary('owned_cancel','k','n')"),
+        ("SELECT group_key FROM syntra_heap_group_uuid_numeric_summary('owned_cancel','u','n')", "SELECT rows=1000000 AND sum=5000005000.00 FROM syntra_heap_group_uuid_numeric_summary('owned_cancel','u','n')"),
     ] {
         reader.batch_execute("SET statement_timeout='1ms'")?;
         let error=reader.query(cancel_sql,&[]).err().ok_or("owned grouping ignored statement timeout")?;
@@ -329,7 +361,7 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
 
     admin.batch_execute("CREATE DATABASE owned_encoding TEMPLATE template0 ENCODING 'LATIN1' LC_COLLATE 'C' LC_CTYPE 'C'")?;
     let mut encoded = cluster.connect("owned_encoding")?;
-    encoded.batch_execute("CREATE EXTENSION syntradb; CREATE TABLE encoding_source(k text,u uuid,v int4); INSERT INTO encoding_source VALUES ('a','00000000-0000-0000-0000-000000000001',1),('a','00000000-0000-0000-0000-000000000001',2)")?;
+    encoded.batch_execute("CREATE EXTENSION syntradb; CREATE TABLE encoding_source(k text,u uuid,v int4,n numeric(5,2) DEFAULT 1.25); INSERT INTO encoding_source VALUES ('a','00000000-0000-0000-0000-000000000001',1),('a','00000000-0000-0000-0000-000000000001',2)")?;
     let refused = encoded
         .query(
             "SELECT group_key FROM syntra_heap_group_text_summary('encoding_source','k','v')",
@@ -342,6 +374,12 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         "encoding rejection returned wrong SQLSTATE",
     )?;
     require(encoded.query_one("SELECT rows=2 AND sum=3 FROM syntra_heap_group_uuid_summary('encoding_source','u','v')",&[])?.try_get(0)?,"UUID grouping incorrectly depended on database text encoding")?;
+    let refused = encoded.query("SELECT group_key FROM syntra_heap_group_text_numeric_summary('encoding_source','k','n')", &[]).err().ok_or("decimal text grouping admitted non-UTF8")?;
+    require(
+        refused.code().is_some_and(|c| c.code() == "0A000"),
+        "decimal encoding rejection returned wrong SQLSTATE",
+    )?;
+    require(encoded.query_one("SELECT rows=2 AND sum=2.50 FROM syntra_heap_group_uuid_numeric_summary('encoding_source','u','n')",&[])?.try_get(0)?,"decimal UUID grouping depended on database encoding")?;
     drop(encoded);
     admin.batch_execute("DROP DATABASE owned_encoding")?;
 
@@ -367,7 +405,7 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     }
     admin.query_one("SELECT syntra_stop_capture('ssi_source')", &[])?;
     admin.batch_execute("DROP TABLE ssi_source")?;
-    eprintln!("SSI checks: 24 fresh-read modes, 60 conflicting transaction pairs, eight read-time aborts with backend reuse, three temporal repeatable-read snapshots and three cached/capture guards passed");
+    eprintln!("SSI checks: 33 fresh-read modes, 78 conflicting transaction pairs, eleven read-time aborts with backend reuse, three temporal repeatable-read snapshots and three cached/capture guards passed");
     Ok(vec![
         "serializable read-write, read-only and deferrable fresh reads without assigned XIDs",
         "source relation predicate locks, including empty and unmatched range reads",
@@ -376,6 +414,7 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         "read-time 40001 unwinds each native heap scan and permits reuse after rollback",
         "date, timestamp and timestamptz filters retain RR snapshots across concurrent predicate/value changes",
         "matching and fully filtered temporal scans honor cancellation and allow subsequent backend reuse",
+        "integer, text and UUID decimal grouping preserve exact scale, RR key/value snapshots and cancellation recovery",
         "text and UUID grouping retain key/value snapshot pairs and permit reuse after cancellation",
         "text grouping refuses non-UTF8 databases while UUID grouping remains available",
         "native invariants checked after participant transactions, without masking custom dependencies",

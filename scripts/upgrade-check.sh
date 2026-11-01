@@ -88,13 +88,18 @@ stop
 
 install_from "$SYNTRA_ROOT" "$SYNTRA_ROOT/target/upgrade-current"
 start
-if [[ "$FROM" == 0.10.0 ]]; then
+if [[ "$FROM" == 0.10.0 || "$FROM" == 0.11.0 ]]; then
     expect "existing temporal API before update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_date_summary(regclass,text,text,date,date)') IS NOT NULL")" "t"
 else
     expect "temporal API absent before SQL update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_date_summary(regclass,text,text,date,date)') IS NULL")" "t"
 fi
-expect "owned grouping API absent before SQL update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_group_text_summary(regclass,text,text,integer,integer)') IS NULL")" "t"
-if [[ "$FROM" == 0.7.0 || "$FROM" == 0.8.0 || "$FROM" == 0.9.0 || "$FROM" == 0.10.0 ]]; then
+if [[ "$FROM" == 0.11.0 ]]; then
+    expect "existing owned grouping API before update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_group_text_summary(regclass,text,text,integer,integer)') IS NOT NULL")" "t"
+else
+    expect "owned grouping API absent before SQL update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_group_text_summary(regclass,text,text,integer,integer)') IS NULL")" "t"
+fi
+expect "decimal grouping absent before SQL update" "$(q upgraded "SELECT to_regprocedure('public.syntra_heap_group_text_numeric_summary(regclass,text,text,integer,integer)') IS NULL")" "t"
+if [[ "$FROM" == 0.7.0 || "$FROM" == 0.8.0 || "$FROM" == 0.9.0 || "$FROM" == 0.10.0 || "$FROM" == 0.11.0 ]]; then
     # 0.8.0 adds grouping; 0.9.0 changes native fresh SSI behavior only. Neither
     # release changes capture storage or blocks writers during the SQL update.
     q upgraded "UPDATE feed SET v=0 WHERE id=1"
@@ -195,7 +200,7 @@ case "$FROM:$DURING" in
     expect "write during the update rolled back" "$(q upgraded "SELECT v FROM feed WHERE id=60")" "60"
     DURING_EVENTS=0
     ;;
-0.6.0:captured | 0.7.0:captured | 0.8.0:captured | 0.9.0:captured | 0.10.0:captured)
+0.6.0:captured | 0.7.0:captured | 0.8.0:captured | 0.9.0:captured | 0.10.0:captured | 0.11.0:captured)
     if [ "$WAITED" -ge 1000 ]; then
         echo "upgrade check failed: a capture write waited ${WAITED} ms for the update" >&2
         exit 1
@@ -221,6 +226,8 @@ esac
 expect "version" "$(q upgraded "SELECT extversion FROM pg_extension WHERE extname='syntradb'")" "$CURRENT"
 expect "temporal API after SQL update" "$(q upgraded "CREATE TEMP TABLE upgrade_time(t date,v int4); INSERT INTO upgrade_time VALUES ('2026-01-01',10),('2026-01-01',20),('2026-01-02',99); SELECT sum FROM syntra_heap_date_summary('upgrade_time','v','t','2026-01-01','2026-01-02')")" "30"
 expect "owned grouping after SQL update" "$(q upgraded "CREATE TEMP TABLE upgrade_owned(k text,u uuid,v int4); INSERT INTO upgrade_owned VALUES ('a','00000000-0000-0000-0000-000000000001',10),('b','00000000-0000-0000-0000-000000000001',20),(NULL,NULL,30); SELECT (SELECT count(*)=3 AND sum(sum)=60 FROM syntra_heap_group_text_summary('upgrade_owned','k','v')) AND (SELECT count(*)=2 AND sum(sum)=60 FROM syntra_heap_group_uuid_summary('upgrade_owned','u','v'))")" "t"
+expect "decimal grouping after SQL update" "$(q upgraded "CREATE TEMP TABLE upgrade_decimal(i int4,k text,u uuid,v numeric(18,2)); INSERT INTO upgrade_decimal VALUES (1,'a','00000000-0000-0000-0000-000000000001',0.99),(1,'a','00000000-0000-0000-0000-000000000001',0.02),(NULL,NULL,NULL,NULL); SELECT (SELECT count(*)=2 AND sum(sum)=1.01 FROM syntra_heap_group_integer_numeric_summary('upgrade_decimal','i','v')) AND (SELECT count(*)=2 AND sum(sum)=1.01 FROM syntra_heap_group_text_numeric_summary('upgrade_decimal','k','v')) AND (SELECT count(*)=2 AND sum(sum)=1.01 FROM syntra_heap_group_uuid_numeric_summary('upgrade_decimal','u','v'))")" "t"
+
 if [[ "$FROM" == 0.5.0 ]]; then
     expect "gap feed trigger" "$(q upgraded "SELECT tgenabled::text||':'||tgdeferrable::text FROM pg_trigger WHERE tgrelid='gap'::regclass AND tgname='_syntra_capture_row'")" "D:false"
     # unslop-ignore NO_SQL_INTERPOLATION -- constant SQL; only the stderr path is a variable.

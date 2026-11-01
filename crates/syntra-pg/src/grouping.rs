@@ -141,3 +141,127 @@ fn syntra_heap_group_integer_summary(
         )
     }))
 }
+
+fn decimal_result<T: Into<i128>>(
+    value: syntra_exec::DecimalResult<T>,
+    scale: crate::numeric::Scale,
+) -> Option<AnyNumeric> {
+    match value {
+        syntra_exec::DecimalResult::Null => None,
+        syntra_exec::DecimalResult::Finite(v) => Some(crate::numeric::to_numeric(v.into(), scale)),
+        syntra_exec::DecimalResult::NaN => Some(
+            AnyNumeric::try_from("NaN").unwrap_or_else(|_| pgrx::error!("invalid numeric NaN")),
+        ),
+    }
+}
+
+#[allow(clippy::type_complexity)]
+#[pg_extern(stable, parallel_unsafe)]
+fn syntra_heap_group_integer_numeric_summary(
+    source: PgRelation,
+    key_column: &str,
+    value_column: &str,
+    max_groups: default!(i32, 1024),
+    max_key_bytes: default!(i32, 8388608),
+) -> TableIterator<
+    'static,
+    (
+        name!(group_key, Option<i64>),
+        name!(rows, i64),
+        name!(non_nulls, i64),
+        name!(sum, Option<AnyNumeric>),
+        name!(min, Option<AnyNumeric>),
+        name!(max, Option<AnyNumeric>),
+    ),
+> {
+    let (groups, bytes) = limits(max_groups, max_key_bytes);
+    let (groups, scale) =
+        crate::source::group_integer_numeric(&source, key_column, value_column, groups, bytes)
+            .unwrap_or_else(|e| grouping_error(e));
+    TableIterator::new(groups.into_iter().map(move |g| {
+        pgrx::check_for_interrupts!();
+        let s = g.summary;
+        (
+            g.key,
+            s.rows(),
+            s.non_nulls(),
+            decimal_result(s.sum(), scale),
+            decimal_result(s.min(), scale),
+            decimal_result(s.max(), scale),
+        )
+    }))
+}
+
+#[allow(clippy::type_complexity)]
+#[pg_extern(stable, parallel_unsafe)]
+fn syntra_heap_group_text_numeric_summary(
+    source: PgRelation,
+    key_column: &str,
+    value_column: &str,
+    max_groups: default!(i32, 1024),
+    max_key_bytes: default!(i32, 8388608),
+) -> TableIterator<
+    'static,
+    (
+        name!(group_key, Option<String>),
+        name!(rows, i64),
+        name!(non_nulls, i64),
+        name!(sum, Option<AnyNumeric>),
+        name!(min, Option<AnyNumeric>),
+        name!(max, Option<AnyNumeric>),
+    ),
+> {
+    let (groups, bytes) = limits(max_groups, max_key_bytes);
+    let (groups, scale) =
+        crate::source::group_text_numeric(&source, key_column, value_column, groups, bytes)
+            .unwrap_or_else(|e| grouping_error(e));
+    TableIterator::new(groups.into_iter().map(move |g| {
+        pgrx::check_for_interrupts!();
+        let s = g.summary;
+        (
+            g.key,
+            s.rows(),
+            s.non_nulls(),
+            decimal_result(s.sum(), scale),
+            decimal_result(s.min(), scale),
+            decimal_result(s.max(), scale),
+        )
+    }))
+}
+
+#[allow(clippy::type_complexity)]
+#[pg_extern(stable, parallel_unsafe)]
+fn syntra_heap_group_uuid_numeric_summary(
+    source: PgRelation,
+    key_column: &str,
+    value_column: &str,
+    max_groups: default!(i32, 1024),
+    max_key_bytes: default!(i32, 8388608),
+) -> TableIterator<
+    'static,
+    (
+        name!(group_key, Option<pgrx::Uuid>),
+        name!(rows, i64),
+        name!(non_nulls, i64),
+        name!(sum, Option<AnyNumeric>),
+        name!(min, Option<AnyNumeric>),
+        name!(max, Option<AnyNumeric>),
+    ),
+> {
+    let (groups, bytes) = limits(max_groups, max_key_bytes);
+    let (groups, scale) =
+        crate::source::group_uuid_numeric(&source, key_column, value_column, groups, bytes)
+            .unwrap_or_else(|e| grouping_error(e));
+    TableIterator::new(groups.into_iter().map(move |g| {
+        pgrx::check_for_interrupts!();
+        let s = g.summary;
+        (
+            g.key,
+            s.rows(),
+            s.non_nulls(),
+            decimal_result(s.sum(), scale),
+            decimal_result(s.min(), scale),
+            decimal_result(s.max(), scale),
+        )
+    }))
+}

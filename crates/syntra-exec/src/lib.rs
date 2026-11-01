@@ -10,6 +10,7 @@ pub use grouping::{
     group_int4, group_int8, group_owned_int8, GroupedInt4Summary, GroupedInt8Summary,
     GroupedSummary, GroupingError, MAX_GROUPS, MAX_KEY_BYTES,
 };
+pub use grouping::{group_owned_decimal, DecimalResult, DecimalSummary};
 
 pub const INTERRUPT_INTERVAL: usize = 1024;
 
