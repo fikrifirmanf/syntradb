@@ -66,3 +66,35 @@ inside the backend. Lock queueing amplifies it, but is not the root cause. The
 data do not show which statement does the work. The dead catalog rows are a
 candidate, not a finding. The single-client run is also confounded by earlier
 saturation, so it cannot give a clean capture-versus-plain ratio.
+
+## CPU profiles
+
+[Run 41326470471](https://github.com/fikrifirmanf/syntradb/actions/runs/41326470471)
+repeated the two-client control for 8 rounds and recorded user-space CPU samples
+(`perf record -e cpu-clock:u -F 199`, 15 s) of the pgbench backends in rounds 1, 4,
+6 and 8, for both tables ([reports](evidence/hold-control-profiles-linux-2026-11-01)).
+Captured again slowed far earlier than plain: round 6 averaged 3,162 ms at 155 tps
+against 46 ms at 195 tps. The reports are self-time only and truncated to the top
+70 rows. Percentages are shares of each backend group's own samples, so they do
+not compare absolute cost between tables.
+
+- **Same dominant cost in both tables.** `heap_hot_search_buffer`
+  (6.6% to 8.4% of captured samples in rounds 4 to 8, 8.0% to 8.3% of plain),
+  `heapam_index_fetch_tuple`, `GlobalVisTestFor` and `GlobalVisTestIsRemovableXid`
+  lead both. These are PostgreSQL walking HOT chains through row versions that
+  cannot be removed while the old snapshot is held.
+- **No SyntraDB function stands out.** In captured, `syntradb.so` symbols appear
+  only in round 1, at 0.4% each (`CatalogScan::open`, UTF-8 validation). Rounds 4,
+  6 and 8 show none in the top 70 rows.
+- **Captured spreads extra work through PostgreSQL itself.** Round 1's captured
+  profile includes `base_yyparse`, `expression_tree_walker_impl` and catalog-cache
+  lookups (3.4%, 1.4% and 1.9%) that plain lacks, which indicates SQL parsed and
+  planned inside the capture trigger. Per-table statistics from the earlier
+  diagnostic run show about 19 to 30 index fetches per transaction on the small
+  capture catalogs (`capture_bindings`, `tracked_sources`, `capture_heads`,
+  `capture_marks`), each walking version chains that grow while the snapshot is held.
+
+These samples do not attribute `heap_hot_search_buffer` to the source table or to
+the capture catalogs, so they do not show which accesses cost the extra time.
+Attributing it needs call stacks or per-statement buffer counts for the capture
+trigger's own queries at a horizon age near 70,000.

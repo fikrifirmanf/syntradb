@@ -1,0 +1,70 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5K of event 'cpu-clock:u'
+# Event count (approx.): 28819091875
+#
+# Overhead  Shared Object  Symbol  IPC  [IPC Coverage]
+# ........  ................  .........................................  ....................
+#
+  8.54%  postgres  [.] palloc0
+  8.02%  postgres  [.] heap_hot_search_buffer
+  4.86%  postgres  [.] LWLockRelease
+  4.32%  postgres  [.] heapam_index_fetch_tuple
+  4.31%  postgres  [.] GlobalVisTestFor
+  3.94%  postgres  [.] StartReadBuffer
+  3.80%  postgres  [.] hash_bytes
+  3.63%  postgres  [.] GlobalVisTestIsRemovableXid
+  3.24%  postgres  [.] LWLockAttemptLock
+  3.12%  postgres  [.] AllocSetAlloc
+  2.63%  postgres  [.] hash_search_with_hash_value
+  2.56%  postgres  [.] AllocSetFree
+  2.49%  postgres  [.] LWLockAcquire
+  2.46%  postgres  [.] UnpinBufferNoOwner
+  2.21%  postgres  [.] LockBuffer
+  2.20%  postgres  [.] GetPrivateRefCountEntry
+  2.20%  postgres  [.] table_index_fetch_tuple_check
+  2.13%  postgres  [.] HeapTupleSatisfiesVisibility
+  1.85%  postgres  [.] ResourceOwnerForget
+  1.74%  postgres  [.] ReleaseAndReadBuffer
+  1.64%  postgres  [.] PinBuffer
+  1.64%  postgres  [.] _bt_doinsert
+  1.53%  postgres  [.] _bt_next
+  1.50%  postgres  [.] index_getnext_tid
+  1.41%  postgres  [.] ResourceOwnerEnlarge
+  1.39%  postgres  [.] heapam_index_fetch_end
+  1.31%  postgres  [.] XidInMVCCSnapshot
+  1.27%  postgres  [.] MakeTupleTableSlot
+  1.27%  postgres  [.] heap_page_prune_opt
+  1.24%  postgres  [.] ReadBufferExtended
+  1.20%  postgres  [.] ResourceOwnerRemember
+  1.17%  postgres  [.] HeapTupleIsSurelyDead
+  1.17%  postgres  [.] index_fetch_heap
+  0.75%  postgres  [.] heapam_index_fetch_begin
+  0.73%  postgres  [.] pgstat_count_backend_io_op
+  0.73%  postgres  [.] tts_buffer_heap_init
+  0.71%  postgres  [.] tts_buffer_heap_clear
+  0.58%  postgres  [.] pfree
+  0.56%  postgres  [.] heapam_slot_callbacks
+  0.54%  postgres  [.] _bt_readpage
+  0.49%  postgres  [.] pgstat_count_io_op
+  0.45%  postgres  [.] ReleaseBuffer
+  0.42%  postgres  [.] ExecDropSingleTupleTableSlot
+  0.40%  postgres  [.] RecoveryInProgress
+  0.40%  postgres  [.] btgettuple
+  0.35%  postgres  [.] IncrTupleDescRefCount
+  0.33%  postgres  [.] tts_buffer_heap_release
+  0.31%  libc.so.6  [.] 0x0000000000188923
+  0.31%  postgres  [.] tag_hash
+  0.30%  postgres  [.] index_getnext_slot
+  0.28%  postgres  [.] ReservePrivateRefCountEntry
+  0.28%  postgres  [.] get_hash_value
+  0.24%  postgres  [.] BufTableLookup
+  0.24%  postgres  [.] CheckForSerializableConflictOutNeeded
+  0.24%  postgres  [.] TransactionIdPrecedes
+  0.23%  libc.so.6  [.] 0x000000000018891d
+  0.23%  postgres  [.] DecrTupleDescRefCount
+  0.17%  postgres  [.] IsCatalogRelation
+  0.14%  postgres  [.] heap_index_delete_tuples
