@@ -11,6 +11,9 @@ ROUNDS="${1:-20}"
 SECONDS_PER_ROUND="${2:-30}"
 RATE="${3:-200}"
 SHAPE="${4:-transfer}"
+# DIAG=1 also samples client wait events during each run and prints per-table
+# statistics after it, to show where a table's time goes as the hold ages.
+DIAG="${DIAG:-0}"
 case "$SHAPE" in transfer | cycle) ;; *) echo "shape must be transfer or cycle" >&2; exit 2 ;; esac
 SYNTRA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$SYNTRA_ROOT"
@@ -69,8 +72,23 @@ HOLDER=$!
 echo "round table tps latency_ms failed dead_tuples horizon_age"
 for round in $(seq 1 "$ROUNDS"); do
     for t in plain captured; do
+        SAMPLER=""
+        if [[ "$DIAG" == 1 ]]; then
+            : >"$WORK/waits.$round.$t"
+            (while true; do
+                q "SELECT coalesce(wait_event_type||':'||wait_event,state) FROM pg_stat_activity WHERE application_name='pgbench' AND backend_type='client backend'" >>"$WORK/waits.$round.$t" 2>/dev/null || true
+                /bin/sleep 0.25
+            done) &
+            SAMPLER=$!
+        fi
         tps="$("$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c 2 -j 2 -R "$RATE" -T "$SECONDS_PER_ROUND" -f "$WORK/$t.sql" feeds 2>&1 \
             | awk '/^tps = /{tps=$3} /^latency average/{lat=$4} /^number of failed/{fail=$5} END{print tps, lat, fail}')"
+        if [[ -n "$SAMPLER" ]]; then
+            kill "$SAMPLER" 2>/dev/null || true
+            wait "$SAMPLER" 2>/dev/null || true
+            echo "diag-waits $round $t $(sort "$WORK/waits.$round.$t" | uniq -c | sort -rn | head -6 | awk '{c=$1; $1=""; printf "%s=%s;", substr($0,2), c}')"
+            q "SELECT 'diag-table $round $t '||relname||' dead='||n_dead_tup||' live='||n_live_tup||' upd='||n_tup_upd||' hot='||n_tup_hot_upd||' seq_read='||seq_tup_read||' idx_fetch='||coalesce(idx_tup_fetch,0)||' bytes='||pg_total_relation_size(relid) FROM pg_stat_user_tables WHERE relname IN ('$t') OR schemaname='syntra' ORDER BY relname"
+        fi
         dead="$(q "SELECT n_dead_tup FROM pg_stat_user_tables WHERE relname='$t'")"
         echo "$round $t $tps $dead $(q "SELECT syntra_cleanup_horizon_age()")"
     done

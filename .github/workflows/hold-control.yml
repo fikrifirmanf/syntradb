@@ -29,6 +29,10 @@ on:
           - '200'
           - '100'
         default: '200'
+      diag:
+        description: Sample wait events and print per-table statistics each round (adds measurement overhead)
+        type: boolean
+        default: false
       shape:
         description: transfer (two updates) or cycle (adds the soak writer's insert, move and delete)
         type: choice
@@ -57,6 +61,7 @@ jobs:
       SECONDS_PER_ROUND: ${{ inputs.seconds }}
       RATE: ${{ inputs.rate }}
       SHAPE: ${{ inputs.shape }}
+      DIAG: ${{ inputs.diag && '1' || '0' }}
       CARGO_TERM_COLOR: never
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
