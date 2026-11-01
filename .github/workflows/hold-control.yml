@@ -41,6 +41,10 @@ on:
         description: Space-separated rounds to CPU-profile with perf (empty for none); adds overhead
         type: string
         default: ''
+      explain_targets:
+        description: If set (for example '1000 30000 60000 80000'), run hold-explain.sh at these horizon ages instead of the control
+        type: string
+        default: ''
       diag:
         description: Sample wait events and print per-table statistics each round (adds measurement overhead)
         type: boolean
@@ -75,6 +79,7 @@ jobs:
       SHAPE: ${{ inputs.shape }}
       CLIENTS: ${{ inputs.clients }}
       PROFILE_ROUNDS: ${{ inputs.profile_rounds }}
+      EXPLAIN_TARGETS: ${{ inputs.explain_targets }}
       DIAG: ${{ inputs.diag && '1' || '0' }}
       CARGO_TERM_COLOR: never
     steps:
@@ -115,7 +120,14 @@ jobs:
       - name: Build project-local PostgreSQL and pgrx
         timeout-minutes: 90
         run: bash scripts/setup.sh 2>&1 | tee benchmarks/results/actions/setup.log
+      - name: Run per-statement EXPLAIN at chosen horizon ages
+        if: inputs.explain_targets != ''
+        timeout-minutes: 120
+        run: |
+          bash benchmarks/scripts/hold-explain.sh "$EXPLAIN_TARGETS" "$CLIENTS" \
+            2>&1 | tee benchmarks/results/actions/hold-explain.log
       - name: Run held-snapshot control
+        if: inputs.explain_targets == ''
         timeout-minutes: 120
         run: |
           vmstat -t 60 > benchmarks/results/actions/load.log &
