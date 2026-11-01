@@ -1,0 +1,122 @@
+{
+  "scope": "Local grouped decimal correctness, lifecycle and pilot installation checks; no throughput qualification",
+  "source_commit": "1c9c5de90f5a036bfb6abca8696b84839a6d81d1",
+  "source_fingerprint": "c4f202e48a07aed287a869fcf364759db684fa96f6850a50543c0d65d0e65a13",
+  "version": "0.12.0",
+  "platform": "macOS aarch64",
+  "postgresql": "18.6",
+  "new_decimal_pg_tests": 28,
+  "new_decimal_kernel_tests": 5,
+  "negative_controls": [
+    "NaN count mutation failed the kernel assertion before restoration",
+    "incorrect 1.2 sum failed native PG test before restoring 1.1"
+  ],
+  "native_scan_checks": {
+    "serializable_read_modes": 33,
+    "conflicting_pairs": 78,
+    "read_time_40001_and_backend_reuse": 11,
+    "decimal_repeatable_read_key_value_snapshots": 3,
+    "decimal_57014_cancellation_and_backend_reuse": 3,
+    "latin1": "text rejected with 0A000; UUID returned exact decimal sum"
+  },
+  "native_driver_build": {
+    "extension_profile": "release",
+    "runner_profile": "release",
+    "extension_version": "0.12.0",
+    "runner_version": "0.12.0",
+    "extension_source_fingerprint": "c4f202e48a07aed287a869fcf364759db684fa96f6850a50543c0d65d0e65a13",
+    "runner_source_fingerprint": "c4f202e48a07aed287a869fcf364759db684fa96f6850a50543c0d65d0e65a13"
+  },
+  "ssi_assertions": [
+    "serializable read-write, read-only and deferrable fresh reads without assigned XIDs",
+    "source relation predicate locks, including empty and unmatched range reads",
+    "write skew aborts one transaction with 40001 for custom and mixed native/custom reads",
+    "empty-table and range-insertion phantoms abort one transaction with 40001",
+    "read-time 40001 unwinds each native heap scan and permits reuse after rollback",
+    "date, timestamp and timestamptz filters retain RR snapshots across concurrent predicate/value changes",
+    "matching and fully filtered temporal scans honor cancellation and allow subsequent backend reuse",
+    "integer, text and UUID decimal grouping preserve exact scale, RR key/value snapshots and cancellation recovery",
+    "text and UUID grouping retain key/value snapshot pairs and permit reuse after cancellation",
+    "text grouping refuses non-UTF8 databases while UUID grouping remains available",
+    "native invariants checked after participant transactions, without masking custom dependencies",
+    "capture, live reuse and checkpoint reuse remain explicitly unsupported under SSI"
+  ],
+  "pilot": {
+    "sha256": "558376d58b434414dce666981027c6265f626e08caae6691c6069b62719836d5",
+    "archive": "syntradb-0.12.0-pg18-aarch64-apple-darwin-pilot.tar.gz",
+    "staged_installation": {
+      "status": "passed",
+      "checks": {
+        "version": "0.12.0",
+        "profile": "release",
+        "fingerprint": "c4f202e48a07aed287a869fcf364759db684fa96f6850a50543c0d65d0e65a13",
+        "rows": 2,
+        "sum": 31,
+        "route": "checkpoint",
+        "pending": 0,
+        "time_sum": 31,
+        "text_group_sum": 31,
+        "uuid_group_sum": 31,
+        "integer_decimal_sum": 2.5,
+        "text_decimal_sum": 2.5,
+        "uuid_decimal_sum": 2.5
+      },
+      "fresh_heap_ssi": "2|31",
+      "private_install": true
+    },
+    "extracted_archive_installation": {
+      "status": "passed",
+      "checks": {
+        "version": "0.12.0",
+        "profile": "release",
+        "fingerprint": "c4f202e48a07aed287a869fcf364759db684fa96f6850a50543c0d65d0e65a13",
+        "rows": 2,
+        "sum": 31,
+        "route": "checkpoint",
+        "pending": 0,
+        "time_sum": 31,
+        "text_group_sum": 31,
+        "uuid_group_sum": 31,
+        "integer_decimal_sum": 2.5,
+        "text_decimal_sum": 2.5,
+        "uuid_decimal_sum": 2.5
+      },
+      "fresh_heap_ssi": "2|31",
+      "private_install": true
+    }
+  },
+  "lifecycle": {
+    "tested_implementation_commit": "734c948b64f5b84f9877d5dfdde1d6c75501f7a6",
+    "later_source_changes": "Two comments document compile-time test SQL; runtime logic unchanged.",
+    "upgrade": "0.11.0 -> 0.12.0, pending capture history preserved, 548 catalog entries equal fresh install",
+    "downgrade": "0.12.0 -> 0.11.0 -> 0.12.0, both libraries, capture history and dependent-view refusal verified",
+    "load": {
+      "seconds": 30,
+      "target_tps": 100,
+      "committed_writes": 2214,
+      "failed_writes": 0,
+      "sql_update_ms": 4
+    }
+  },
+  "github": {
+    "core_run": 41291002834,
+    "dependency_run": 41291004683,
+    "lifecycle_run": 41291005719,
+    "lifecycle_cases": 36,
+    "status_at_recording": "pending; no Linux pass claimed"
+  },
+  "limitations": [
+    "Held-snapshot throughput gate remains failed",
+    "No production deployment or release tag",
+    "No planner routing, new checkpoint key types or time-window grouping"
+  ],
+  "full_local_checks": {
+    "command": "bash scripts/check.sh",
+    "status": "passed",
+    "postgresql_tests": 274,
+    "python_tests": 18,
+    "formatting": "passed",
+    "clippy_workspace_all_targets_warnings_denied": "passed",
+    "rust_tests": "passed"
+  }
+}

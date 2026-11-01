@@ -469,7 +469,8 @@ restore the 0.11 library and restart it. Existing integer-measure grouping APIs
 remain available. The reverse update restores decimal grouping.
 
 `scripts/downgrade-0.12.0-check.sh` checks both libraries, retained capture history,
-dependent-view refusal and catalog equality against fresh installs.
+dependent-view refusal and catalog equality against fresh installs. The
+[verification record](verification-0.12.0.md) lists local results and pending CI.
 
 ## 0.10.0 to 0.11.0
 
