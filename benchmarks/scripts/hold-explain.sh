@@ -7,12 +7,13 @@
 # position); keep them in step. The maintenance worker drains the feed as in
 # hold-control.sh. Writers are paced (RATE, default 200 per second in total):
 # unthrottled writers fill the 4,096-event capture log faster than the worker
-# drains it and fail with 54000.
+# drains it and fail with 54000. A background loop applies and prunes the feed,
+# as the soak's maintenance workers do; busy refusals are expected and ignored.
 # Usage: hold-explain.sh [targets, space-separated] [clients]
 set -euo pipefail
 TARGETS="${1:-1000 30000 60000 80000}"
 CLIENTS="${2:-2}"
-RATE="${RATE:-200}"
+RATE="${RATE:-100}"
 SYNTRA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$SYNTRA_ROOT"
 bash scripts/setup-production.sh >/dev/null
@@ -30,7 +31,9 @@ PORT=28963
 printf "\nlisten_addresses = ''\nunix_socket_directories = '%s'\nport = %s\nshared_preload_libraries = 'syntradb'\nsyntradb.maintenance_database = 'feeds'\nsyntradb.maintenance_interval_ms = 200\n" \
     "$SOCKET" "$PORT" >>"$WORK/data/postgresql.conf"
 HOLDER=""
+DRAINER=""
 cleanup() {
+    if [[ -n "$DRAINER" ]]; then kill "$DRAINER" 2>/dev/null || true; fi
     if [[ -n "$HOLDER" ]]; then kill "$HOLDER" 2>/dev/null || true; fi
     "$BIN/pg_ctl" -D "$WORK/data" -w -t 30 stop -m immediate >/dev/null 2>&1 || true
 }
@@ -58,6 +61,8 @@ SQL
 psqlx -c "BEGIN ISOLATION LEVEL REPEATABLE READ" -c "SELECT count(*) FROM captured" -c "SELECT pg_sleep(86400)" >/dev/null 2>&1 &
 HOLDER=$!
 /bin/sleep 2
+(while true; do q "SELECT syntra_apply_prune_capture('captured')" >/dev/null 2>&1 || true; /bin/sleep 0.2; done) &
+DRAINER=$!
 explain_all() {
     local age="$1"
     echo "=== horizon_age=$age"
@@ -90,6 +95,7 @@ SQL
 age() { q "SELECT syntra_cleanup_horizon_age()"; }
 read -r -a targets <<<"$TARGETS"
 next=0
+failures=0
 for chunk in $(seq 1 120); do
     a="$(age)"
     while (( next < ${#targets[@]} )) && (( a >= targets[next] )); do
@@ -97,7 +103,8 @@ for chunk in $(seq 1 120); do
         next=$((next + 1))
     done
     (( next >= ${#targets[@]} )) && break
-    out="$("$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c "$CLIENTS" -j "$CLIENTS" -R "$RATE" -T 30 -f "$WORK/captured.sql" feeds 2>&1)" || echo "pgbench exited $?: $(printf '%s\n' "$out" | grep -i 'error\|abort' | head -3)" | tee -a "$WORK/explain.log"
+    if (( failures >= 5 )); then echo "giving up: five consecutive failed chunks" | tee -a "$WORK/explain.log"; break; fi
+    out="$("$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c "$CLIENTS" -j "$CLIENTS" -R "$RATE" -T 30 -f "$WORK/captured.sql" feeds 2>&1)" && failures=0 || { failures=$((failures + 1)); echo "pgbench failed: $(printf '%s\n' "$out" | grep -i 'error\|abort' | head -2)" | tee -a "$WORK/explain.log"; }
     printf '%s\n' "$out" | awk '/^tps = /{tps=$3} /^latency average/{lat=$4} /^number of failed/{fail=$5} END{print "chunk tps="tps" latency_ms="lat" failed="fail}' | tee -a "$WORK/explain.log"
 done
 echo "work dir $WORK"
