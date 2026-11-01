@@ -456,6 +456,24 @@ atomic dependency refusal and catalog equality with fresh installs. The
 [verification record](verification-0.10.0.md) distinguishes local results from
 passing native Linux checks.
 
+## 0.10.0 to 0.11.0
+
+0.11.0 adds two [text/UUID grouping functions](text-uuid-grouping.md). It changes
+no capture bytes or existing function signatures. Install the new library,
+restart old sessions (or PostgreSQL if preloaded), then run
+`ALTER EXTENSION syntradb UPDATE` in each database. Capture writes and
+maintenance keep working before and during this additive SQL update.
+
+To downgrade, run `ALTER EXTENSION syntradb UPDATE TO '0.10.0'` while 0.11.0
+remains installed. Dependent views block removal atomically. Resolve those
+objects explicitly, then retry. Install the old library afterward and restart
+sessions, or PostgreSQL if preloaded. The temporal and integer APIs remain.
+
+`scripts/downgrade-0.11.0-check.sh` swaps both libraries and checks pending
+capture history, dependency refusal and fresh-catalog parity. The
+[verification record](verification-0.11.0.md) distinguishes local checks from
+pending native Linux results.
+
 ## Upgrade check
 
 ```sh
@@ -468,6 +486,7 @@ bash scripts/upgrade-check.sh 0.6.0    # from 0.6.0
 bash scripts/upgrade-check.sh 0.7.0    # from 0.7.0
 bash scripts/upgrade-check.sh 0.8.0    # from 0.8.0
 bash scripts/upgrade-check.sh 0.9.0    # from 0.9.0
+bash scripts/upgrade-check.sh 0.10.0   # from 0.10.0
 ```
 
 The check builds the archived source

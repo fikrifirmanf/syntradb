@@ -5,10 +5,14 @@ use syntra_core::{AggregateError, Int4Summary, Int8Summary};
 
 /// Hard cap on distinct keys, including the SQL NULL group.
 pub const MAX_GROUPS: usize = 65_536;
+/// Logical bytes retained in distinct non-NULL keys, separate from RSS.
+pub const MAX_KEY_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupingError {
     InvalidLimit,
+    InvalidKeyLimit,
+    KeyBytesLimitExceeded { limit: usize },
     GroupLimitExceeded { limit: usize },
     AllocationFailed,
     Cancelled,
@@ -19,6 +23,12 @@ impl fmt::Display for GroupingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidLimit => write!(f, "group limit must be between 1 and {MAX_GROUPS}"),
+            Self::InvalidKeyLimit => {
+                write!(f, "key byte limit must be between 1 and {MAX_KEY_BYTES}")
+            }
+            Self::KeyBytesLimitExceeded { limit } => {
+                write!(f, "distinct key bytes exceed limit {limit}")
+            }
             Self::GroupLimitExceeded { limit } => write!(f, "group count exceeds limit {limit}"),
             Self::AllocationFailed => f.write_str("cannot allocate bounded grouping state"),
             Self::Cancelled => f.write_str("grouped aggregation cancelled"),
@@ -28,6 +38,73 @@ impl fmt::Display for GroupingError {
 }
 
 impl std::error::Error for GroupingError {}
+
+/// Owned-key counterpart for text/UUID adapters. Equality is supplied by K;
+/// adapters must establish that it matches their SQL type and collation.
+/// Key bytes count distinct retained payloads only, not repeated input keys.
+/// Input adapters must also bound individual keys before copying/detoasting.
+/// NULL consumes a group slot and zero payload bytes. Output is sorted by K,
+/// NULL first; no locale sort order is implied by a text adapter.
+pub fn group_owned_int8<K: Eq + Hash + Ord>(
+    input: impl IntoIterator<Item = (Option<K>, Option<i64>)>,
+    max_groups: usize,
+    max_key_bytes: usize,
+    key_bytes: impl Fn(&K) -> usize,
+    mut keep_running: impl FnMut() -> bool,
+) -> Result<Vec<GroupedSummary<K, Int8Summary>>, GroupingError> {
+    if !(1..=MAX_GROUPS).contains(&max_groups) {
+        return Err(GroupingError::InvalidLimit);
+    }
+    if !(1..=MAX_KEY_BYTES).contains(&max_key_bytes) {
+        return Err(GroupingError::InvalidKeyLimit);
+    }
+    let mut poll = || {
+        if keep_running() {
+            Ok(())
+        } else {
+            Err(GroupingError::Cancelled)
+        }
+    };
+    poll()?;
+    let mut groups: HashMap<Option<K>, Int8Summary> = HashMap::new();
+    groups
+        .try_reserve(max_groups)
+        .map_err(|_| GroupingError::AllocationFailed)?;
+    let mut bytes = 0usize;
+    for (key, value) in input {
+        // Keys can be large, so poll every input rather than every 1024 rows.
+        poll()?;
+        if let Some(summary) = groups.get_mut(&key) {
+            summary.push(value).map_err(GroupingError::Aggregate)?;
+            continue;
+        }
+        if groups.len() == max_groups {
+            return Err(GroupingError::GroupLimitExceeded { limit: max_groups });
+        }
+        bytes = bytes
+            .checked_add(key.as_ref().map_or(0, &key_bytes))
+            .filter(|b| *b <= max_key_bytes)
+            .ok_or(GroupingError::KeyBytesLimitExceeded {
+                limit: max_key_bytes,
+            })?;
+        let mut summary = Int8Summary::default();
+        summary.push(value).map_err(GroupingError::Aggregate)?;
+        groups.insert(key, summary);
+    }
+    poll()?;
+    let mut result = Vec::new();
+    result
+        .try_reserve_exact(groups.len())
+        .map_err(|_| GroupingError::AllocationFailed)?;
+    result.extend(
+        groups
+            .into_iter()
+            .map(|(key, summary)| GroupedSummary { key, summary }),
+    );
+    result.sort_unstable_by(|a, b| a.key.cmp(&b.key));
+    poll()?;
+    Ok(result)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GroupedSummary<K, S> {

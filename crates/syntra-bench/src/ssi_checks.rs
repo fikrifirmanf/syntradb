@@ -17,6 +17,8 @@ enum ReadPath {
     Heap,
     Range,
     Grouping,
+    TextGrouping,
+    UuidGrouping,
     Date,
     Timestamp,
     Timestamptz,
@@ -30,6 +32,8 @@ impl ReadPath {
             Self::Heap => "SELECT sum FROM syntra_heap_int4_summary('ssi_source','v') LIMIT 1",
             Self::Range => "SELECT sum FROM syntra_heap_int4_range_summary('ssi_source','v',1,1) LIMIT 1",
             Self::Grouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_integer_summary('ssi_source','k','v')",
+            Self::TextGrouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_text_summary('ssi_source','label','v')",
+            Self::UuidGrouping => "SELECT sum(sum)::bigint FROM syntra_heap_group_uuid_summary('ssi_source','identity','v')",
             Self::Date => "SELECT sum::bigint FROM syntra_heap_date_summary('ssi_source','v','d','2026-01-01','2026-01-02') LIMIT 1",
             Self::Timestamp => "SELECT sum::bigint FROM syntra_heap_timestamp_summary('ssi_source','v','t','2026-01-01','2026-01-02') LIMIT 1",
             Self::Timestamptz => "SELECT sum::bigint FROM syntra_heap_timestamptz_summary('ssi_source','v','z','2026-01-01+00','2026-01-02+00') LIMIT 1",
@@ -132,7 +136,7 @@ fn conflict(
 
 pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     let mut admin = cluster.connect("syntra_enabled")?;
-    admin.batch_execute("CREATE TABLE ssi_source(k int4 PRIMARY KEY,v int4,d date DEFAULT '2026-01-01',t timestamp DEFAULT '2026-01-01',z timestamptz DEFAULT '2026-01-01+00'); INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
+    admin.batch_execute("CREATE TABLE ssi_source(k int4 PRIMARY KEY,v int4,d date DEFAULT '2026-01-01',t timestamp DEFAULT '2026-01-01',z timestamptz DEFAULT '2026-01-01+00',label text COLLATE \"C\" DEFAULT 'label',identity uuid DEFAULT '00000000-0000-0000-0000-000000000001'); INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
     let mut reader = cluster.connect("syntra_enabled")?;
     for mode in [
         "BEGIN ISOLATION LEVEL SERIALIZABLE",
@@ -143,6 +147,8 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
             ReadPath::Heap,
             ReadPath::Range,
             ReadPath::Grouping,
+            ReadPath::TextGrouping,
+            ReadPath::UuidGrouping,
             ReadPath::Date,
             ReadPath::Timestamp,
             ReadPath::Timestamptz,
@@ -168,6 +174,8 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         ReadPath::Heap,
         ReadPath::Range,
         ReadPath::Grouping,
+        ReadPath::TextGrouping,
+        ReadPath::UuidGrouping,
         ReadPath::Date,
         ReadPath::Timestamp,
         ReadPath::Timestamptz,
@@ -203,6 +211,8 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         ReadPath::Heap,
         ReadPath::Range,
         ReadPath::Grouping,
+        ReadPath::TextGrouping,
+        ReadPath::UuidGrouping,
         ReadPath::Date,
         ReadPath::Timestamp,
         ReadPath::Timestamptz,
@@ -291,6 +301,50 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     }
     admin.batch_execute("DROP TABLE temporal_cancel")?;
 
+    for (sql, initial, changed) in [
+        ("SELECT string_agg(coalesce(group_key,'NULL')||':'||sum::text,',' ORDER BY group_key) FROM syntra_heap_group_text_summary('ssi_source','label','v')", "label:2", "label:1,moved:7"),
+        ("SELECT string_agg(coalesce(group_key::text,'NULL')||':'||sum::text,',' ORDER BY group_key) FROM syntra_heap_group_uuid_summary('ssi_source','identity','v')", "00000000-0000-0000-0000-000000000001:2", "00000000-0000-0000-0000-000000000001:1,00000000-0000-0000-0000-000000000002:7"),
+    ] {
+        admin.batch_execute("TRUNCATE ssi_source; INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
+        reader.batch_execute("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")?;
+        require(reader.query_one(sql,&[])?.try_get::<_,String>(0)?==initial,"owned grouping initial snapshot changed")?;
+        admin.batch_execute("UPDATE ssi_source SET v=7,label='moved',identity='00000000-0000-0000-0000-000000000002' WHERE k=1")?;
+        require(reader.query_one(sql,&[])?.try_get::<_,String>(0)?==initial,"owned grouping mixed old and new key/value versions")?;
+        reader.batch_execute("COMMIT")?;
+        require(reader.query_one(sql,&[])?.try_get::<_,String>(0)?==changed,"owned grouping fresh snapshot missed changed keys")?;
+    }
+
+    admin.batch_execute("CREATE TABLE owned_cancel(k text,u uuid,v int4); INSERT INTO owned_cancel SELECT 'same','00000000-0000-0000-0000-000000000001',g FROM generate_series(1,1000000) g")?;
+    for (cancel_sql,reuse_sql) in [
+        ("SELECT group_key FROM syntra_heap_group_text_summary('owned_cancel','k','v')", "SELECT rows=1000000 AND sum=500000500000 FROM syntra_heap_group_text_summary('owned_cancel','k','v')"),
+        ("SELECT group_key FROM syntra_heap_group_uuid_summary('owned_cancel','u','v')", "SELECT rows=1000000 AND sum=500000500000 FROM syntra_heap_group_uuid_summary('owned_cancel','u','v')"),
+    ] {
+        reader.batch_execute("SET statement_timeout='1ms'")?;
+        let error=reader.query(cancel_sql,&[]).err().ok_or("owned grouping ignored statement timeout")?;
+        require(error.code().is_some_and(|c|c.code()=="57014"),"owned grouping cancellation returned wrong SQLSTATE")?;
+        reader.batch_execute("SET statement_timeout='5s'")?;
+        require(reader.query_one(reuse_sql,&[])?.try_get(0)?,"owned grouping backend did not recover after cancellation")?;
+    }
+    admin.batch_execute("DROP TABLE owned_cancel")?;
+
+    admin.batch_execute("CREATE DATABASE owned_encoding TEMPLATE template0 ENCODING 'LATIN1' LC_COLLATE 'C' LC_CTYPE 'C'")?;
+    let mut encoded = cluster.connect("owned_encoding")?;
+    encoded.batch_execute("CREATE EXTENSION syntradb; CREATE TABLE encoding_source(k text,u uuid,v int4); INSERT INTO encoding_source VALUES ('a','00000000-0000-0000-0000-000000000001',1),('a','00000000-0000-0000-0000-000000000001',2)")?;
+    let refused = encoded
+        .query(
+            "SELECT group_key FROM syntra_heap_group_text_summary('encoding_source','k','v')",
+            &[],
+        )
+        .err()
+        .ok_or("text grouping admitted a non-UTF8 database")?;
+    require(
+        refused.code().is_some_and(|c| c.code() == "0A000"),
+        "encoding rejection returned wrong SQLSTATE",
+    )?;
+    require(encoded.query_one("SELECT rows=2 AND sum=3 FROM syntra_heap_group_uuid_summary('encoding_source','u','v')",&[])?.try_get(0)?,"UUID grouping incorrectly depended on database text encoding")?;
+    drop(encoded);
+    admin.batch_execute("DROP DATABASE owned_encoding")?;
+
     // Source capture and reusable state keep the old restriction. They have no
     // proof yet that their metadata reads supply the source's SSI dependencies.
     admin.batch_execute("TRUNCATE ssi_source; INSERT INTO ssi_source VALUES(1,1),(2,1)")?;
@@ -313,7 +367,7 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
     }
     admin.query_one("SELECT syntra_stop_capture('ssi_source')", &[])?;
     admin.batch_execute("DROP TABLE ssi_source")?;
-    eprintln!("SSI checks: 18 fresh-read modes, 48 conflicting transaction pairs, six read-time aborts with backend reuse, three temporal repeatable-read snapshots and three cached/capture guards passed");
+    eprintln!("SSI checks: 24 fresh-read modes, 60 conflicting transaction pairs, eight read-time aborts with backend reuse, three temporal repeatable-read snapshots and three cached/capture guards passed");
     Ok(vec![
         "serializable read-write, read-only and deferrable fresh reads without assigned XIDs",
         "source relation predicate locks, including empty and unmatched range reads",
@@ -322,6 +376,8 @@ pub(super) fn run(cluster: &Cluster) -> Result<Vec<&'static str>> {
         "read-time 40001 unwinds each native heap scan and permits reuse after rollback",
         "date, timestamp and timestamptz filters retain RR snapshots across concurrent predicate/value changes",
         "matching and fully filtered temporal scans honor cancellation and allow subsequent backend reuse",
+        "text and UUID grouping retain key/value snapshot pairs and permit reuse after cancellation",
+        "text grouping refuses non-UTF8 databases while UUID grouping remains available",
         "native invariants checked after participant transactions, without masking custom dependencies",
         "capture, live reuse and checkpoint reuse remain explicitly unsupported under SSI",
     ])

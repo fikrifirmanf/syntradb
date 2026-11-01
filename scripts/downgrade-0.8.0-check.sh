@@ -8,7 +8,7 @@ bash scripts/setup-production.sh
 export PGRX_HOME="$SYNTRA_ROOT/.pgrx"
 export PATH="$SYNTRA_ROOT/.tools/bin:$PATH"
 CURRENT="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
-[[ "$CURRENT" == 0.8.0 || "$CURRENT" == 0.9.0 || "$CURRENT" == 0.10.0 ]] || { echo "downgrade check requires workspace 0.8.0, 0.9.0 or 0.10.0" >&2; exit 2; }
+[[ "$CURRENT" == 0.8.0 || "$CURRENT" == 0.9.0 || "$CURRENT" == 0.10.0 || "$CURRENT" == 0.11.0 ]] || { echo "downgrade check requires workspace 0.8.0, 0.9.0 or 0.10.0 or 0.11.0" >&2; exit 2; }
 WORK="$SYNTRA_ROOT/target/downgrade-0.8.0-check/$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -p "$WORK/base"
 tar xzf build-support/upgrade-baselines/syntradb-0.7.0-src.tgz -C "$WORK/base"

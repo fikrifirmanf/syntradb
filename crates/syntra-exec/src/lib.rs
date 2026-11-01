@@ -7,8 +7,8 @@ use syntra_storage::{Int4Group, Int4Segment, SegmentError};
 
 mod grouping;
 pub use grouping::{
-    group_int4, group_int8, GroupedInt4Summary, GroupedInt8Summary, GroupedSummary, GroupingError,
-    MAX_GROUPS,
+    group_int4, group_int8, group_owned_int8, GroupedInt4Summary, GroupedInt8Summary,
+    GroupedSummary, GroupingError, MAX_GROUPS, MAX_KEY_BYTES,
 };
 
 pub const INTERRUPT_INTERVAL: usize = 1024;

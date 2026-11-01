@@ -137,6 +137,7 @@ mod tests {
     include!("heap_tests.rs");
     include!("temporal_tests.rs");
     include!("grouping_tests.rs");
+    include!("owned_grouping_tests.rs");
     include!("live_tests.rs");
     include!("capture_tests.rs");
     include!("checkpoint_tests.rs");

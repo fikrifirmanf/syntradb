@@ -13,6 +13,8 @@ fixed projections. Named copies now have an owner-isolated catalog and atomic re
 Fresh [time-window aggregates](docs/temporal-aggregates.md) filter `date`,
 `timestamp` or `timestamptz` columns while summarizing integer or fixed-scale
 decimal values. They use explicit SQL functions and the caller's MVCC snapshot.
+Fresh [text and UUID grouping](docs/text-uuid-grouping.md) also supports integer
+measures, with group-count and retained-key-byte limits.
 Automatic analytical paths remain unimplemented. The [baseline harness](benchmarks/README.md) compares the prototype
 with PostgreSQL on declared workloads.
 

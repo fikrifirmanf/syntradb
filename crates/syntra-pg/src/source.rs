@@ -179,10 +179,11 @@ impl<V> Drop for SourceScan<'_, V> {
 }
 
 /// Read both fields from the same MVCC-visible tuple. The value scan owns the
-/// slot and scan; copying the integer key retains no PostgreSQL tuple pointer.
+/// slot and scan; copying an owned key retains no PostgreSQL tuple pointer.
 struct SourcePairs<'a, K, V> {
     values: SourceScan<'a, V>,
     key: i16,
+    text_key_limit: Option<usize>,
     _key: PhantomData<K>,
 }
 
@@ -191,12 +192,25 @@ impl<K: FromDatum, V: FromDatum> Iterator for SourcePairs<'_, K, V> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let value = self.values.next()?;
-        // SAFETY: validation checked both integer attribute types under the
+        // SAFETY: validation checked both attribute types under the
         // relation lock. SourceScan just filled this live slot, and FromDatum
-        // copies the by-value key before the next tuple can replace the slot.
+        // copies the owned key before the next tuple can replace the slot.
         let key = unsafe {
             let mut is_null = false;
             let datum = pg_sys::slot_getattr(self.values.slot, i32::from(self.key), &mut is_null);
+            if !is_null {
+                if let Some(limit) = self.text_key_limit {
+                    // Only the checked built-in text adapter sets this limit.
+                    // PostgreSQL reports raw payload + standard 4-byte header
+                    // without decompressing/fetching an oversized toasted key.
+                    let bytes = pg_sys::toast_raw_datum_size(datum).saturating_sub(4);
+                    if bytes > limit {
+                        crate::grouping::grouping_error(
+                            syntra_exec::GroupingError::KeyBytesLimitExceeded { limit },
+                        );
+                    }
+                }
+            }
             K::from_datum(datum, is_null)
         };
         Some((key, value))
@@ -232,11 +246,149 @@ fn group_integer_checked<K: crate::Column, V: crate::Column>(
     let rows = SourcePairs::<K, V> {
         values: SourceScan::new(source, value, snapshot),
         key,
+        text_key_limit: None,
         _key: PhantomData,
     };
     syntra_exec::group_int8(
         rows.map(|(key, value)| (key.map(Into::into), value.map(Into::into))),
         max_groups,
+        || {
+            pgrx::check_for_interrupts!();
+            true
+        },
+    )
+}
+
+pub(super) fn group_text(
+    source: &PgRelation,
+    key: &str,
+    value: &str,
+    groups: usize,
+    bytes: usize,
+) -> Result<
+    Vec<syntra_exec::GroupedSummary<String, syntra_core::Int8Summary>>,
+    syntra_exec::GroupingError,
+> {
+    let key = validate_column(
+        source,
+        key,
+        &[pg_sys::TEXTOID],
+        "text grouping requires a stored, non-generated text key",
+    )
+    .0;
+    let (value, value_type) = validate_column(
+        source,
+        value,
+        &[pg_sys::INT2OID, pg_sys::INT4OID, pg_sys::INT8OID],
+        "grouping values must be stored, non-generated int2, int4 or int8 columns",
+    );
+    let collation = source
+        .tuple_desc()
+        .iter()
+        .find(|a| a.attnum == key)
+        .map(|a| a.attcollation)
+        .unwrap_or_else(|| unsupported("text key metadata is missing"));
+    // SAFETY: main backend thread, built-in text column checked under the
+    // relation lock. No locale pointer or PostgreSQL datum enters Rust state.
+    unsafe {
+        if pg_sys::GetDatabaseEncoding() != pg_sys::pg_enc::PG_UTF8 as i32 {
+            unsupported("text grouping requires UTF8 database encoding");
+        }
+        if !pg_sys::get_collation_isdeterministic(collation) {
+            unsupported("text grouping requires a deterministic source collation");
+        }
+    }
+    match value_type {
+        pg_sys::INT2OID => group_owned_checked::<String, i16>(
+            source,
+            key,
+            value,
+            groups,
+            bytes,
+            Some(bytes),
+            String::len,
+        ),
+        pg_sys::INT4OID => group_owned_checked::<String, i32>(
+            source,
+            key,
+            value,
+            groups,
+            bytes,
+            Some(bytes),
+            String::len,
+        ),
+        pg_sys::INT8OID => group_owned_checked::<String, i64>(
+            source,
+            key,
+            value,
+            groups,
+            bytes,
+            Some(bytes),
+            String::len,
+        ),
+        _ => unsupported("unsupported integer value type"),
+    }
+}
+
+pub(super) fn group_uuid(
+    source: &PgRelation,
+    key: &str,
+    value: &str,
+    groups: usize,
+    bytes: usize,
+) -> Result<
+    Vec<syntra_exec::GroupedSummary<pgrx::Uuid, syntra_core::Int8Summary>>,
+    syntra_exec::GroupingError,
+> {
+    let key = validate_column(
+        source,
+        key,
+        &[pg_sys::UUIDOID],
+        "UUID grouping requires a stored, non-generated uuid key",
+    )
+    .0;
+    let (value, value_type) = validate_column(
+        source,
+        value,
+        &[pg_sys::INT2OID, pg_sys::INT4OID, pg_sys::INT8OID],
+        "grouping values must be stored, non-generated int2, int4 or int8 columns",
+    );
+    match value_type {
+        pg_sys::INT2OID => {
+            group_owned_checked::<pgrx::Uuid, i16>(source, key, value, groups, bytes, None, |_| 16)
+        }
+        pg_sys::INT4OID => {
+            group_owned_checked::<pgrx::Uuid, i32>(source, key, value, groups, bytes, None, |_| 16)
+        }
+        pg_sys::INT8OID => {
+            group_owned_checked::<pgrx::Uuid, i64>(source, key, value, groups, bytes, None, |_| 16)
+        }
+        _ => unsupported("unsupported integer value type"),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn group_owned_checked<K: FromDatum + Eq + std::hash::Hash + Ord, V: FromDatum + Into<i64>>(
+    source: &PgRelation,
+    key: i16,
+    value: i16,
+    groups: usize,
+    bytes: usize,
+    text_key_limit: Option<usize>,
+    key_bytes: impl Fn(&K) -> usize,
+) -> Result<Vec<syntra_exec::GroupedSummary<K, syntra_core::Int8Summary>>, syntra_exec::GroupingError>
+{
+    let rows = SourcePairs::<K, V> {
+        values: SourceScan::new(source, value, heap_snapshot()),
+        key,
+        text_key_limit,
+        _key: PhantomData,
+    };
+    syntra_exec::group_owned_int8(
+        rows.map(|(k, v)| (k, v.map(Into::into))),
+        groups,
+        bytes,
+        key_bytes,
         || {
             pgrx::check_for_interrupts!();
             true

@@ -17,8 +17,8 @@ export PGRX_HOME="$SYNTRA_ROOT/.pgrx"
 export PATH="$SYNTRA_ROOT/.tools/bin:$PATH"
 OLD=0.6.0
 CURRENT="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
-if [[ "$CURRENT" != 0.7.0 && "$CURRENT" != 0.8.0 && "$CURRENT" != 0.9.0 && "$CURRENT" != 0.10.0 ]]; then
-    echo "downgrade check failed: this check covers 0.7.0 through 0.10.0 to 0.6.0, workspace is '$CURRENT'" >&2
+if [[ "$CURRENT" != 0.7.0 && "$CURRENT" != 0.8.0 && "$CURRENT" != 0.9.0 && "$CURRENT" != 0.10.0 && "$CURRENT" != 0.11.0 ]]; then
+    echo "downgrade check failed: this check covers 0.7.0 through 0.11.0 to 0.6.0, workspace is '$CURRENT'" >&2
     exit 1
 fi
 WORK="$SYNTRA_ROOT/target/downgrade-0.7.0-check/$(date +%Y%m%d-%H%M%S)-$$"
