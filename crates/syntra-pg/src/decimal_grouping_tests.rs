@@ -3,7 +3,9 @@ macro_rules! decimal_group_case {
     ($name:ident,$key:literal,$typ:literal,$function:literal,$seed:literal) => {
         #[pg_test]
         fn $name() {
+            // unslop-ignore NO_SQL_INTERPOLATION -- Macro arguments are compile-time test literals; types and DDL cannot use SQL bindings.
             Spi::run(concat!("CREATE TEMP TABLE decimal_groups(k ",$key,",v ",$typ,"); INSERT INTO decimal_groups VALUES ",$seed)).unwrap();
+            // unslop-ignore NO_SQL_INTERPOLATION -- Only compile-time function-name literals enter this native-oracle test query.
             assert_owned_groups_match(concat!("WITH actual AS (SELECT group_key,rows,non_nulls,sum,min,max FROM ",$function,"('decimal_groups','k','v')), expected AS (SELECT k group_key,count(*) rows,count(v) non_nulls,sum(v) sum,min(v) min,max(v) max FROM decimal_groups GROUP BY k) SELECT NOT EXISTS(SELECT group_key,rows,non_nulls,sum,min,max FROM actual EXCEPT ALL SELECT group_key,rows,non_nulls,sum,min,max FROM expected) AND NOT EXISTS(SELECT group_key,rows,non_nulls,sum,min,max FROM expected EXCEPT ALL SELECT group_key,rows,non_nulls,sum,min,max FROM actual)"));
         }
     };
