@@ -98,3 +98,55 @@ These samples do not attribute `heap_hot_search_buffer` to the source table or t
 the capture catalogs, so they do not show which accesses cost the extra time.
 Attributing it needs call stacks or per-statement buffer counts for the capture
 trigger's own queries at a horizon age near 70,000.
+
+## Per-statement EXPLAIN under a held snapshot
+
+[Run 41331086964](https://github.com/fikrifirmanf/syntradb/actions/runs/41331086964)
+(`benchmarks/scripts/hold-explain.sh`, [full log](evidence/hold-explain-linux-2026-11-02.log))
+aged a captured table under a held snapshot at 100 paced cycles per second, with a
+background apply-and-prune loop, and at four horizon ages ran
+`EXPLAIN (ANALYZE, BUFFERS)` on the statements the capture trigger runs for each
+changed row. The SQL mirrors `crates/syntra-pg/src/capture.rs`. The two catalog
+reads that the trigger makes through the native reader (the newest mark and the
+binding lookups) are emulated with equivalent queries. Each measurement ran in an
+otherwise idle session, so it excludes queueing behind other writers.
+
+| Horizon age | Head lock and join | Newest mark | Event and mark insert |
+|---|---|---|---|
+| 6,526 | 14 buffers, 0.058 ms, plan 0.24 ms | 2 buffers, 0.013 ms | 35 buffers, 0.354 ms, plan 0.07 ms |
+| 32,758 | 40 buffers, 0.077 ms, plan 0.27 ms | 4 buffers, 0.022 ms | 36 buffers, 0.417 ms |
+| 65,127 | 75 buffers, 0.156 ms, plan 0.41 ms | 4 buffers, 0.033 ms | 37 buffers, 0.409 ms |
+| 82,520 | 95 buffers, 0.192 ms, plan 0.42 ms | 3 buffers, 0.019 ms | 37 buffers, 0.410 ms |
+
+The binding and tracked-source lookups stayed at 2 buffers and under 0.01 ms at
+every age. At the same ages the paced writers' average latency went from 5.3 ms to
+18.9 ms to 2,702 ms (samples from chunks 1, 7 and 13 of the log).
+
+**Reading.**
+
+- No single statement is slow. Even at age 82,520 each takes under 0.5 ms, and the
+  catalog tables the earlier statistics flagged as bloated (`capture_marks`,
+  `capture_events`) are not walked: their reads stay at a few buffers because the
+  scans start at the newest entry. That removes dead catalog rows from the list of
+  suspects for the per-statement cost.
+- Only the head-row lock grows with age: 14 to 95 buffers and 0.058 to 0.192 ms,
+  with its planning time rising from 0.24 to 0.42 ms. The head row gains a version
+  with every prune and apply while the snapshot is held.
+- The trigger fires once per changed row, and a soak-writer cycle changes five
+  rows. Planning and running the two SQL statements costs about 0.7 ms per firing,
+  so about 3.5 ms per cycle. That matches the 3.5 ms by which captured exceeded
+  plain in round 1 of the control (5.3 ms against 1.8 ms at age 12,668).
+- A fixed extra cost of that size per transaction lowers the throughput at which
+  the writers saturate. A queueing cliff would then appear earlier for captured than
+  for plain, even though the cost itself grows slowly. This fits the earlier
+  observations but is not proved: the single-client run was confounded by
+  saturation, and no run has changed the per-row cost and shown the cliff move.
+
+**Candidate changes** (none made, each needs the control rerun to test it):
+
+1. Save and reuse the two SPI plans instead of parsing and planning them on every
+   firing. This removes about 0.3 ms of the roughly 0.7 ms per firing and needs no
+   format change.
+2. Do the head lock and the event and mark insert once per transaction instead of
+   once per changed row.
+3. Insert the event and mark rows through the heap API instead of SQL.
