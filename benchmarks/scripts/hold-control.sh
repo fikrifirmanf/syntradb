@@ -17,6 +17,11 @@ DIAG="${DIAG:-0}"
 # CLIENTS is the number of pgbench clients per run (default 2). One client removes
 # writer-against-writer lock queueing from the comparison.
 CLIENTS="${CLIENTS:-2}"
+# PROFILE_ROUNDS (space-separated round numbers) with PERF_BIN records user CPU
+# samples of the pgbench backends in those rounds and writes self-time reports to
+# $WORK/profile-<round>-<table>.txt. Needs sudo for perf. Adds overhead.
+PROFILE_ROUNDS="${PROFILE_ROUNDS:-}"
+PERF_BIN="${PERF_BIN:-}"
 case "$SHAPE" in transfer | cycle) ;; *) echo "shape must be transfer or cycle" >&2; exit 2 ;; esac
 SYNTRA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$SYNTRA_ROOT"
@@ -84,8 +89,25 @@ for round in $(seq 1 "$ROUNDS"); do
             done) &
             SAMPLER=$!
         fi
+        PROFILER=""
+        if [[ -n "$PERF_BIN" && " $PROFILE_ROUNDS " == *" $round "* ]]; then
+            (
+                /bin/sleep 6
+                pids="$(q "SELECT string_agg(pid::text, ',') FROM pg_stat_activity WHERE application_name='pgbench' AND backend_type='client backend'")"
+                if [[ -n "$pids" ]]; then
+                    sudo "$PERF_BIN" record -e cpu-clock:u -F 199 -p "$pids" -o "$WORK/perf.$round.$t.data" -- /bin/sleep 15 >/dev/null 2>&1 || true
+                    sudo "$PERF_BIN" report -i "$WORK/perf.$round.$t.data" --no-children --sort dso,symbol --stdio 2>/dev/null | head -70 >"$WORK/profile-$round-$t.txt" || true
+                    sudo rm -f "$WORK/perf.$round.$t.data"
+                fi
+            ) &
+            PROFILER=$!
+        fi
         tps="$("$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c "$CLIENTS" -j "$CLIENTS" -R "$RATE" -T "$SECONDS_PER_ROUND" -f "$WORK/$t.sql" feeds 2>&1 \
             | awk '/^tps = /{tps=$3} /^latency average/{lat=$4} /^number of failed/{fail=$5} END{print tps, lat, fail}')"
+        if [[ -n "$PROFILER" ]]; then
+            wait "$PROFILER" || true
+            cp "$WORK/profile-$round-$t.txt" "$SYNTRA_ROOT/benchmarks/results/actions/" 2>/dev/null || true
+        fi
         if [[ -n "$SAMPLER" ]]; then
             kill "$SAMPLER" 2>/dev/null || true
             wait "$SAMPLER" 2>/dev/null || true

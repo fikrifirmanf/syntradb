@@ -36,6 +36,10 @@ on:
           - '2'
           - '1'
         default: '2'
+      profile_rounds:
+        description: Space-separated rounds to CPU-profile with perf (empty for none); adds overhead
+        type: string
+        default: ''
       diag:
         description: Sample wait events and print per-table statistics each round (adds measurement overhead)
         type: boolean
@@ -69,6 +73,7 @@ jobs:
       RATE: ${{ inputs.rate }}
       SHAPE: ${{ inputs.shape }}
       CLIENTS: ${{ inputs.clients }}
+      PROFILE_ROUNDS: ${{ inputs.profile_rounds }}
       DIAG: ${{ inputs.diag && '1' || '0' }}
       CARGO_TERM_COLOR: never
     steps:
@@ -92,6 +97,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config libicu-dev libreadline-dev zlib1g-dev libssl-dev libclang-dev clang bison flex
+      - name: Install Linux profiler
+        if: inputs.profile_rounds != ''
+        run: |
+          sudo apt-get install -y linux-tools-generic ripgrep
+          roots=()
+          for root in /usr/lib/linux-tools*; do
+            if [[ -d "$root" ]]; then roots+=("$root"); fi
+          done
+          [[ ${#roots[@]} -gt 0 ]] || { echo 'No Linux tools directories installed' >&2; exit 1; }
+          perf_bin="$(rg --files --follow --hidden --no-ignore "${roots[@]}" -g perf | sort -Vu | tail -n 1)"
+          [[ -x "$perf_bin" ]] || { echo 'No perf executable installed' >&2; exit 1; }
+          printf 'PERF_BIN=%s\n' "$perf_bin" >> "$GITHUB_ENV"
+          "$perf_bin" version
+          sudo sysctl kernel.perf_event_paranoid=-1 kernel.kptr_restrict=0 || true
       - name: Build project-local PostgreSQL and pgrx
         timeout-minutes: 90
         run: bash scripts/setup.sh 2>&1 | tee benchmarks/results/actions/setup.log
