@@ -1,0 +1,570 @@
+{
+ "run": "https://github.com/fikrifirmanf/syntradb/actions/runs/41320540326",
+ "version": "0.12.0",
+ "script": "benchmarks/scripts/hold-control.sh 20 30 200 cycle (DIAG=1 CLIENTS=2)",
+ "note": "Wait-event samples are every 0.25 s from pg_stat_activity (pgbench sessions). Diagnostics add measurement overhead.",
+ "rows": [
+  {
+   "round": 1,
+   "table": "plain",
+   "tps": 203.05171,
+   "latency_ms": 1.85,
+   "failed": 0,
+   "dead_tuples": 24364,
+   "horizon_age": 6316
+  },
+  {
+   "round": 1,
+   "table": "captured",
+   "tps": 193.637722,
+   "latency_ms": 5.19,
+   "failed": 0,
+   "dead_tuples": 23236,
+   "horizon_age": 12566
+  },
+  {
+   "round": 2,
+   "table": "plain",
+   "tps": 199.838436,
+   "latency_ms": 4.279,
+   "failed": 0,
+   "dead_tuples": 48716,
+   "horizon_age": 18867
+  },
+  {
+   "round": 2,
+   "table": "captured",
+   "tps": 202.12283,
+   "latency_ms": 10.631,
+   "failed": 0,
+   "dead_tuples": 47492,
+   "horizon_age": 25380
+  },
+  {
+   "round": 3,
+   "table": "plain",
+   "tps": 206.831044,
+   "latency_ms": 7.419,
+   "failed": 0,
+   "dead_tuples": 73456,
+   "horizon_age": 31888
+  },
+  {
+   "round": 3,
+   "table": "captured",
+   "tps": 200.637942,
+   "latency_ms": 19.859,
+   "failed": 0,
+   "dead_tuples": 71572,
+   "horizon_age": 38340
+  },
+  {
+   "round": 4,
+   "table": "plain",
+   "tps": 198.418789,
+   "latency_ms": 11.751,
+   "failed": 0,
+   "dead_tuples": 97344,
+   "horizon_age": 44593
+  },
+  {
+   "round": 4,
+   "table": "captured",
+   "tps": 203.073688,
+   "latency_ms": 87.141,
+   "failed": 0,
+   "dead_tuples": 95944,
+   "horizon_age": 51112
+  },
+  {
+   "round": 5,
+   "table": "plain",
+   "tps": 197.725655,
+   "latency_ms": 21.077,
+   "failed": 0,
+   "dead_tuples": 121067,
+   "horizon_age": 57349
+  },
+  {
+   "round": 5,
+   "table": "captured",
+   "tps": 178.294717,
+   "latency_ms": 1227.888,
+   "failed": 0,
+   "dead_tuples": 117340,
+   "horizon_age": 63088
+  },
+  {
+   "round": 6,
+   "table": "plain",
+   "tps": 198.254382,
+   "latency_ms": 80.804,
+   "failed": 0,
+   "dead_tuples": 144884,
+   "horizon_age": 69339
+  },
+  {
+   "round": 6,
+   "table": "captured",
+   "tps": 156.044867,
+   "latency_ms": 3091.56,
+   "failed": 0,
+   "dead_tuples": 136068,
+   "horizon_age": 74381
+  },
+  {
+   "round": 7,
+   "table": "plain",
+   "tps": 187.652812,
+   "latency_ms": 891.343,
+   "failed": 0,
+   "dead_tuples": 167368,
+   "horizon_age": 80314
+  },
+  {
+   "round": 7,
+   "table": "captured",
+   "tps": 139.895916,
+   "latency_ms": 4028.899,
+   "failed": 0,
+   "dead_tuples": 152860,
+   "horizon_age": 84854
+  },
+  {
+   "round": 8,
+   "table": "plain",
+   "tps": 165.121846,
+   "latency_ms": 2490.026,
+   "failed": 0,
+   "dead_tuples": 187120,
+   "horizon_age": 90111
+  },
+  {
+   "round": 8,
+   "table": "captured",
+   "tps": 126.078298,
+   "latency_ms": 5650.082,
+   "failed": 0,
+   "dead_tuples": 167992,
+   "horizon_age": 94233
+  },
+  {
+   "round": 9,
+   "table": "plain",
+   "tps": 150.692501,
+   "latency_ms": 3590.159,
+   "failed": 0,
+   "dead_tuples": 205139,
+   "horizon_age": 99055
+  },
+  {
+   "round": 9,
+   "table": "captured",
+   "tps": 118.318875,
+   "latency_ms": 5950.768,
+   "failed": 0,
+   "dead_tuples": 182192,
+   "horizon_age": 102940
+  },
+  {
+   "round": 10,
+   "table": "plain",
+   "tps": 139.929753,
+   "latency_ms": 4610.685,
+   "failed": 0,
+   "dead_tuples": 221900,
+   "horizon_age": 107440
+  },
+  {
+   "round": 10,
+   "table": "captured",
+   "tps": 110.095295,
+   "latency_ms": 6564.843,
+   "failed": 0,
+   "dead_tuples": 195408,
+   "horizon_age": 111074
+  },
+  {
+   "round": 11,
+   "table": "plain",
+   "tps": 130.119189,
+   "latency_ms": 5514.532,
+   "failed": 0,
+   "dead_tuples": 237464,
+   "horizon_age": 115281
+  },
+  {
+   "round": 11,
+   "table": "captured",
+   "tps": 103.023718,
+   "latency_ms": 6860.016,
+   "failed": 0,
+   "dead_tuples": 207772,
+   "horizon_age": 118701
+  },
+  {
+   "round": 12,
+   "table": "plain",
+   "tps": 122.677162,
+   "latency_ms": 5797.279,
+   "failed": 0,
+   "dead_tuples": 252180,
+   "horizon_age": 122685
+  },
+  {
+   "round": 12,
+   "table": "captured",
+   "tps": 97.252862,
+   "latency_ms": 7769.364,
+   "failed": 0,
+   "dead_tuples": 219448,
+   "horizon_age": 125925
+  },
+  {
+   "round": 13,
+   "table": "plain",
+   "tps": 115.728492,
+   "latency_ms": 6298.485,
+   "failed": 0,
+   "dead_tuples": 265988,
+   "horizon_age": 129698
+  },
+  {
+   "round": 13,
+   "table": "captured",
+   "tps": 92.279387,
+   "latency_ms": 8225.626,
+   "failed": 0,
+   "dead_tuples": 230528,
+   "horizon_age": 132791
+  },
+  {
+   "round": 14,
+   "table": "plain",
+   "tps": 109.29107,
+   "latency_ms": 6914.474,
+   "failed": 0,
+   "dead_tuples": 279120,
+   "horizon_age": 136372
+  },
+  {
+   "round": 14,
+   "table": "captured",
+   "tps": 87.634262,
+   "latency_ms": 8423.951,
+   "failed": 0,
+   "dead_tuples": 241048,
+   "horizon_age": 139323
+  },
+  {
+   "round": 15,
+   "table": "plain",
+   "tps": 105.617076,
+   "latency_ms": 6750.682,
+   "failed": 0,
+   "dead_tuples": 291768,
+   "horizon_age": 142793
+  },
+  {
+   "round": 15,
+   "table": "captured",
+   "tps": 85.318582,
+   "latency_ms": 8480.684,
+   "failed": 0,
+   "dead_tuples": 251288,
+   "horizon_age": 145659
+  },
+  {
+   "round": 16,
+   "table": "plain",
+   "tps": 101.131608,
+   "latency_ms": 7115.001,
+   "failed": 0,
+   "dead_tuples": 303888,
+   "horizon_age": 148995
+  },
+  {
+   "round": 16,
+   "table": "captured",
+   "tps": 80.019191,
+   "latency_ms": 8854.366,
+   "failed": 0,
+   "dead_tuples": 260900,
+   "horizon_age": 151704
+  },
+  {
+   "round": 17,
+   "table": "plain",
+   "tps": 96.403554,
+   "latency_ms": 7501.201,
+   "failed": 0,
+   "dead_tuples": 315800,
+   "horizon_age": 154898
+  },
+  {
+   "round": 17,
+   "table": "captured",
+   "tps": 73.641646,
+   "latency_ms": 9766.244,
+   "failed": 0,
+   "dead_tuples": 269740,
+   "horizon_age": 157402
+  },
+  {
+   "round": 18,
+   "table": "plain",
+   "tps": 93.230854,
+   "latency_ms": 7854.684,
+   "failed": 0,
+   "dead_tuples": 326968,
+   "horizon_age": 160504
+  },
+  {
+   "round": 18,
+   "table": "captured",
+   "tps": 72.129739,
+   "latency_ms": 9520.569,
+   "failed": 0,
+   "dead_tuples": 278396,
+   "horizon_age": 162959
+  },
+  {
+   "round": 19,
+   "table": "plain",
+   "tps": 90.349515,
+   "latency_ms": 8007.191,
+   "failed": 0,
+   "dead_tuples": 337768,
+   "horizon_age": 165973
+  },
+  {
+   "round": 19,
+   "table": "captured",
+   "tps": 69.204696,
+   "latency_ms": 9826.049,
+   "failed": 0,
+   "dead_tuples": 286704,
+   "horizon_age": 168338
+  },
+  {
+   "round": 20,
+   "table": "plain",
+   "tps": 85.904324,
+   "latency_ms": 8521.553,
+   "failed": 0,
+   "dead_tuples": 348032,
+   "horizon_age": 171214
+  },
+  {
+   "round": 20,
+   "table": "captured",
+   "tps": 68.413664,
+   "latency_ms": 10004.527,
+   "failed": 0,
+   "dead_tuples": 294916,
+   "horizon_age": 173549
+  }
+ ],
+ "wait_samples": [
+  {
+   "round": 1,
+   "table": "plain",
+   "samples": "Client:ClientRead=201;active=27;idle=2;IO:WalWrite=2;idle in transaction=1;IO:WalSync=1;"
+  },
+  {
+   "round": 1,
+   "table": "captured",
+   "samples": "Client:ClientRead=150;active=71;Lock:transactionid=5;idle in transaction=3;IO:WalSync=3;idle=1;"
+  },
+  {
+   "round": 2,
+   "table": "plain",
+   "samples": "Client:ClientRead=159;active=67;IO:WalSync=4;idle in transaction=2;=1;"
+  },
+  {
+   "round": 2,
+   "table": "captured",
+   "samples": "active=122;Client:ClientRead=99;Lock:transactionid=7;idle in transaction=3;"
+  },
+  {
+   "round": 3,
+   "table": "plain",
+   "samples": "active=119;Client:ClientRead=104;IO:WalSync=5;idle in transaction=4;idle=1;IO:WalWrite=1;"
+  },
+  {
+   "round": 3,
+   "table": "captured",
+   "samples": "active=144;Client:ClientRead=55;Lock:transactionid=15;idle in transaction=5;Lock:tuple=5;IO:WalSync=4;"
+  },
+  {
+   "round": 4,
+   "table": "plain",
+   "samples": "active=138;Client:ClientRead=87;idle in transaction=2;IO:WalWrite=2;IO:WalSync=2;idle=1;"
+  },
+  {
+   "round": 4,
+   "table": "captured",
+   "samples": "active=182;Lock:transactionid=19;Client:ClientRead=17;idle in transaction=6;Lock:tuple=6;IO:WalSync=2;"
+  },
+  {
+   "round": 5,
+   "table": "plain",
+   "samples": "active=173;Client:ClientRead=55;IO:WalSync=3;idle in transaction=1;"
+  },
+  {
+   "round": 5,
+   "table": "captured",
+   "samples": "active=200;Lock:transactionid=11;Client:ClientRead=9;Lock:tuple=5;idle in transaction=4;IO:WalSync=3;"
+  },
+  {
+   "round": 6,
+   "table": "plain",
+   "samples": "active=192;Client:ClientRead=24;IO:WalSync=9;idle in transaction=6;LWLock:WALWrite=1;"
+  },
+  {
+   "round": 6,
+   "table": "captured",
+   "samples": "active=176;Lock:transactionid=29;Lock:tuple=14;Client:ClientRead=7;idle in transaction=4;IO:WalSync=2;"
+  },
+  {
+   "round": 7,
+   "table": "plain",
+   "samples": "active=219;IO:WalSync=5;idle in transaction=3;Client:ClientRead=3;starting=1;"
+  },
+  {
+   "round": 7,
+   "table": "captured",
+   "samples": "active=191;Lock:transactionid=20;Lock:tuple=10;idle in transaction=4;IO:WalSync=4;Client:ClientRead=3;"
+  },
+  {
+   "round": 8,
+   "table": "plain",
+   "samples": "active=223;Client:ClientRead=6;idle in transaction=3;"
+  },
+  {
+   "round": 8,
+   "table": "captured",
+   "samples": "active=206;Lock:transactionid=11;idle in transaction=5;IO:WalSync=4;Lock:tuple=3;starting=1;"
+  },
+  {
+   "round": 9,
+   "table": "plain",
+   "samples": "active=219;Client:ClientRead=6;idle in transaction=5;IO:WalSync=2;"
+  },
+  {
+   "round": 9,
+   "table": "captured",
+   "samples": "active=191;Lock:transactionid=17;Lock:tuple=12;idle in transaction=5;Client:ClientRead=5;idle=1;"
+  },
+  {
+   "round": 10,
+   "table": "plain",
+   "samples": "active=223;Client:ClientRead=4;idle in transaction=2;IO:WalSync=2;IO:WalWrite=1;"
+  },
+  {
+   "round": 10,
+   "table": "captured",
+   "samples": "active=192;Lock:transactionid=17;Lock:tuple=12;IO:WalSync=4;Client:ClientRead=4;idle in transaction=2;"
+  },
+  {
+   "round": 11,
+   "table": "plain",
+   "samples": "active=222;Client:ClientRead=5;idle in transaction=2;IO:WalSync=1;"
+  },
+  {
+   "round": 11,
+   "table": "captured",
+   "samples": "active=189;Lock:transactionid=18;Lock:tuple=12;Client:ClientRead=10;IO:WalSync=2;idle=1;"
+  },
+  {
+   "round": 12,
+   "table": "plain",
+   "samples": "active=221;IO:WalSync=6;Client:ClientRead=3;idle in transaction=1;LWLock:WALWrite=1;"
+  },
+  {
+   "round": 12,
+   "table": "captured",
+   "samples": "active=195;Lock:transactionid=16;Lock:tuple=11;IO:WalSync=4;idle in transaction=3;Client:ClientRead=2;"
+  },
+  {
+   "round": 13,
+   "table": "plain",
+   "samples": "active=225;Client:ClientRead=3;idle in transaction=2;starting=1;IO:WalSync=1;"
+  },
+  {
+   "round": 13,
+   "table": "captured",
+   "samples": "active=192;Lock:transactionid=17;Lock:tuple=12;idle in transaction=5;IO:WalWrite=2;IO:WalSync=1;"
+  },
+  {
+   "round": 14,
+   "table": "plain",
+   "samples": "active=227;LWLock:WALWrite=1;IO:WalSync=1;Client:ClientRead=1;"
+  },
+  {
+   "round": 14,
+   "table": "captured",
+   "samples": "active=189;Lock:transactionid=20;Lock:tuple=10;idle in transaction=6;Client:ClientRead=5;IO:WalSync=2;"
+  },
+  {
+   "round": 15,
+   "table": "plain",
+   "samples": "active=222;idle in transaction=3;Client:ClientRead=3;starting=1;Lock:transactionid=1;IO:WalSync=1;"
+  },
+  {
+   "round": 15,
+   "table": "captured",
+   "samples": "active=199;Lock:transactionid=15;Lock:tuple=13;Client:ClientRead=2;idle in transaction=1;IO:WalSync=1;"
+  },
+  {
+   "round": 16,
+   "table": "plain",
+   "samples": "active=221;Client:ClientRead=5;IO:WalSync=3;idle in transaction=2;LWLock:WALWrite=1;"
+  },
+  {
+   "round": 16,
+   "table": "captured",
+   "samples": "active=197;Lock:transactionid=20;Lock:tuple=9;Client:ClientRead=4;IO:WalWrite=1;IO:WalSync=1;"
+  },
+  {
+   "round": 17,
+   "table": "plain",
+   "samples": "active=225;Client:ClientRead=3;IO:WalSync=2;Lock:transactionid=1;"
+  },
+  {
+   "round": 17,
+   "table": "captured",
+   "samples": "active=181;Lock:transactionid=25;Lock:tuple=17;idle in transaction=2;Client:ClientRead=2;idle=1;"
+  },
+  {
+   "round": 18,
+   "table": "plain",
+   "samples": "active=227;idle in transaction=3;Client:ClientRead=2;"
+  },
+  {
+   "round": 18,
+   "table": "captured",
+   "samples": "active=181;Lock:transactionid=25;Lock:tuple=18;Client:ClientRead=5;idle in transaction=2;IO:WalSync=1;"
+  },
+  {
+   "round": 19,
+   "table": "plain",
+   "samples": "active=224;Client:ClientRead=4;idle in transaction=2;IO:WalWrite=1;IO:WalSync=1;"
+  },
+  {
+   "round": 19,
+   "table": "captured",
+   "samples": "active=188;Lock:transactionid=20;Lock:tuple=17;Client:ClientRead=3;starting=1;idle in transaction=1;"
+  },
+  {
+   "round": 20,
+   "table": "plain",
+   "samples": "active=228;Client:ClientRead=4;"
+  },
+  {
+   "round": 20,
+   "table": "captured",
+   "samples": "active=170;Lock:transactionid=30;Lock:tuple=23;idle in transaction=3;IO:WalSync=3;Client:ClientRead=3;"
+  }
+ ]
+}

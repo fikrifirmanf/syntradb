@@ -38,3 +38,31 @@ No gate was relaxed and this run does not claim the load gate is met. It
 suggests the gate should compare SyntraDB with a matched native run at each
 horizon age. The band between about 40,000 and 110,000 is the open engineering
 target.
+
+## Wait-event diagnostics
+
+Two further runs of the same control with `DIAG=1` sampled the pgbench sessions'
+wait events every 0.25 seconds and printed per-table statistics each round
+([two clients](evidence/hold-control-diag-2clients-linux-2026-11-01.json),
+[one client](evidence/hold-control-diag-1client-linux-2026-11-01.json)). Sampling
+adds overhead, and each is one run.
+
+**Two clients (run 41320540326).** The slowdown reproduced: in round 6 captured
+averaged 3,092 ms at 156 tps against 81 ms at 198 tps for plain. Captured writers
+showed `Lock:transactionid` (29 samples) and `Lock:tuple` (14); plain showed none.
+In round 7, `capture_marks` held 170,085 dead rows beside 20,990 live, and
+`capture_events` 204,102 dead beside 25,188 live.
+
+**One client (run 41323300174).** Lock waits almost disappeared (one or two
+samples per round). Captured was still slower early, 98 ms against 3.8 ms in round
+1, but now both tables saturated sooner because one session cannot keep up with
+200 transactions per second once each transaction slows. From round 7 captured
+trailed plain by about 10% in tps and 3% in latency. Most samples in both tables
+were `active`, meaning the backend was running rather than waiting.
+
+**Reading.** Writers queue on row locks when there are two, but removing the
+queue does not remove captured's extra per-transaction cost; that cost is CPU work
+inside the backend. Lock queueing amplifies it, but is not the root cause. The
+data do not show which statement does the work. The dead catalog rows are a
+candidate, not a finding. The single-client run is also confounded by earlier
+saturation, so it cannot give a clean capture-versus-plain ratio.
