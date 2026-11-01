@@ -472,7 +472,7 @@ sessions, or PostgreSQL if preloaded. The temporal and integer APIs remain.
 `scripts/downgrade-0.11.0-check.sh` swaps both libraries and checks pending
 capture history, dependency refusal and fresh-catalog parity. The
 [verification record](verification-0.11.0.md) distinguishes local checks from
-pending native Linux results.
+passing native Linux results.
 
 ## Upgrade check
 

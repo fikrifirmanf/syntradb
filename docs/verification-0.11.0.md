@@ -61,5 +61,7 @@ also passed. The [Linux evidence](../benchmarks/evidence/owned-grouping-linux-20
 records terminal jobs, log hashes and the producer's archive checksum.
 
 The expanded [33-case lifecycle suite](https://github.com/fikrifirmanf/syntradb/actions/runs/41276235562)
-is still running. These functional checks make no performance claim and do
-not close the earlier held-snapshot throughput gate.
+passed all 33 cases and its planning job at `031a6f2`. The
+[terminal job record](../benchmarks/evidence/owned-grouping-lifecycle-linux-2026-11-01.json)
+preserves every result. These functional checks make no performance claim and
+do not close the earlier held-snapshot throughput gate.
