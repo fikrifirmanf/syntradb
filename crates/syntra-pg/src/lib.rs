@@ -43,6 +43,7 @@ macro_rules! with_layout {
 pub(crate) use with_layout;
 
 mod capture;
+mod capture_batch;
 mod checkpoint;
 mod ddl;
 mod grouping;

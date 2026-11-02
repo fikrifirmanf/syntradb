@@ -176,3 +176,29 @@ It does not close the gap: at about 75,000 captured still averages 1,880 ms agai
 are indistinguishable. This is one run each, so differences of a few percent are
 within noise. The remaining per-firing cost (the head-row lock, the event and mark
 insert, and five firings per cycle) is untouched.
+
+## Commit-time batching
+
+[Run 41340936860](https://github.com/fikrifirmanf/syntradb/actions/runs/41340936860)
+repeated the control with deferred firings at commit buffered and written by one
+pre-commit insert and mark per source ([data](evidence/hold-control-batched-linux-2026-11-02.json),
+design in [capture-batching-design](../docs/capture-batching-design.md)). It also
+includes kept plans. Sums matched and no transaction failed.
+
+| Round | Horizon age | Captured, kept plans | Captured, batched | Plain, this run |
+|---|---|---|---|---|
+| 1 | 12,772 | 3 ms / 206 | 3 ms / 203 | 2 ms |
+| 4 | 51,018 | 26 ms / 202 | 18 ms / 201 | 12 ms |
+| 5 | 63,770 | 215 ms / 195 | 64 ms / 202 | 19 ms |
+| 6 | 76,004 | 1,880 ms / 171 | 742 ms / 186 | 66 ms |
+| 7 | 87,257 | n/a | 2,391 ms / 163 | 415 ms |
+| 8 | 97,351 | n/a | 3,908 ms / 146 | 1,951 ms |
+| 20 | 178,044 | n/a | 9,684 ms / 71 | 8,841 ms |
+| 40 | 267,092 | n/a | 11,292 ms / 50 | 10,561 ms |
+
+Below the cliff the captured table is now within about 1 ms of plain (round 1: 2.5
+against 1.9 ms), and the cliff moves right by about another round: round 6 falls from
+1,880 to 742 ms. It still does not close the gap through the middle of the curve (round
+7: 2,391 ms against 415 ms), and past about 110,000 of horizon age captured trails plain
+by 10 to 20 percent in throughput (50 against 59 tps at round 40). One run per variant on
+shared runners, so treat differences of a few percent as noise. The load gate stays open.

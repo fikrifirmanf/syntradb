@@ -8,7 +8,7 @@ use pgrx::trigger_support::{PgTriggerLevel, PgTriggerWhen};
 use pgrx::{AllocatedByPostgres, PgRelation};
 use std::{ffi::CStr, num::NonZeroUsize};
 
-fn stale() -> ! {
+pub(super) fn stale() -> ! {
     pgrx::ereport!(
         ERROR,
         pgrx::PgSqlErrorCode::ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE,
@@ -16,7 +16,7 @@ fn stale() -> ! {
     );
 }
 
-fn full() -> ! {
+pub(super) fn full() -> ! {
     pgrx::ereport!(
         ERROR,
         pgrx::PgSqlErrorCode::ERRCODE_PROGRAM_LIMIT_EXCEEDED,
@@ -845,14 +845,14 @@ fn head_plan() -> Result<&'static OwnedPreparedStatement, pgrx::spi::Error> {
         ],
     )
 }
-fn append_plan() -> Result<&'static OwnedPreparedStatement, pgrx::spi::Error> {
+pub(super) fn append_plan() -> Result<&'static OwnedPreparedStatement, pgrx::spi::Error> {
     kept_plan(
         &APPEND_PLAN,
         r#"WITH inserted AS (
         INSERT INTO syntra.capture_events(source_relation,epoch,ordinal,origin_xid,command_id,key,before_present,before_value,after_present,after_value)
-        SELECT $1,$2,$3+e.position,pg_catalog.pg_current_xact_id(),$9,e.key,e.bp,e.bv,e.ap,e.av
-        FROM unnest($4::int8[],$5::boolean[],$6::int8[],$7::boolean[],$8::int8[])
-        WITH ORDINALITY AS e(key,bp,bv,ap,av,position) RETURNING ordinal
+        SELECT $1,$2,$3+e.position,pg_catalog.pg_current_xact_id(),e.command,e.key,e.bp,e.bv,e.ap,e.av
+        FROM unnest($4::int8[],$5::boolean[],$6::int8[],$7::boolean[],$8::int8[],$9::int8[])
+        WITH ORDINALITY AS e(key,bp,bv,ap,av,command,position) RETURNING ordinal
     ), marked AS (
         INSERT INTO syntra.capture_marks(source_relation,epoch,ordinal,live_rows) VALUES($1,$2,$3+$10,$11)
     ) SELECT count(*) FROM inserted"#,
@@ -865,7 +865,7 @@ fn append_plan() -> Result<&'static OwnedPreparedStatement, pgrx::spi::Error> {
             PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID),
             PgOid::BuiltIn(PgBuiltInOids::BOOLARRAYOID),
             PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID),
-            PgOid::BuiltIn(PgBuiltInOids::INT8OID),
+            PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID),
             PgOid::BuiltIn(PgBuiltInOids::INT8OID),
             PgOid::BuiltIn(PgBuiltInOids::INT8OID),
         ],
@@ -906,51 +906,71 @@ fn syntra_capture_row<'a>(
         stale();
     }
     let row_delta = i64::from(new.is_some()) - i64::from(old.is_some());
-    let count = changes.len() as i32;
+    let count = changes.len() as i64;
+    let command = unsafe { i64::from(pg_sys::GetCurrentCommandId(false)) };
+    // Lock, do not update, the head row. The lock is held to commit, so ordinals
+    // stay gap-free and follow commit order as they did with the counter update,
+    // but the row gains no version per write. Only pruning still updates it.
+    // A deferred firing at commit locks on its first call and buffers its changes;
+    // a pre-commit callback then writes them all with one insert and one mark
+    // (capture_batch.rs). Any other firing, such as SET CONSTRAINTS IMMEDIATE
+    // inside a statement, writes its own events and mark at once.
+    let batched = crate::capture_batch::at_commit(oid);
+    let held = if batched {
+        crate::capture_batch::state(oid, config.epoch)
+    } else {
+        None
+    };
+    let (emitted, live, limit) = match held {
+        Some(state) => state,
+        None => {
+            let (floor, limit, floor_rows) = Spi::connect_mut(|client| {
+                client
+                    .update(
+                        head_plan()?,
+                        Some(1),
+                        &[
+                            oid.into(),
+                            config.epoch.into(),
+                            trigger.trigger().tgoid.into(),
+                        ],
+                    )?
+                    .first()
+                    .get_three::<i64, i64, i64>()
+            })?;
+            let (Some(floor), Some(limit), Some(floor_rows)) = (floor, limit, floor_rows) else {
+                full()
+            };
+            // A latest snapshot sees every mark committed before this lock was
+            // granted, including under repeatable read, and this transaction's
+            // own earlier marks.
+            let (emitted, live) = {
+                let _latest = Snapshot::latest();
+                // SAFETY: the guard above pins this MVCC snapshot through the scan.
+                let snapshot = unsafe { pg_sys::GetActiveSnapshot() };
+                position(&source, snapshot, config.epoch, floor, floor_rows)
+                    .unwrap_or_else(|| stale())
+            };
+            if batched {
+                crate::capture_batch::begin(oid, config.epoch, emitted, live, limit);
+            }
+            (emitted, live, limit)
+        }
+    };
+    let live = live + row_delta;
+    if emitted > limit - count || emitted > i64::MAX - count || !(0..=1_000_000).contains(&live) {
+        full();
+    }
+    if batched {
+        crate::capture_batch::record(oid, &changes, command, row_delta);
+        return Ok(None);
+    }
     let keys: Vec<i64> = changes.iter().map(|c| c.0).collect();
     let before: Vec<bool> = changes.iter().map(|c| c.1.is_some()).collect();
     let old: Vec<Option<i64>> = changes.iter().map(|c| c.1.flatten()).collect();
     let after: Vec<bool> = changes.iter().map(|c| c.2.is_some()).collect();
     let new: Vec<Option<i64>> = changes.iter().map(|c| c.2.flatten()).collect();
-    let command = unsafe { i64::from(pg_sys::GetCurrentCommandId(false)) };
-    // Lock, do not update, the head row. The lock is held to commit, so ordinals
-    // stay gap-free and follow commit order as they did with the counter update,
-    // but the row gains no version per write. Only pruning still updates it.
-    // This trigger is deferred, so the first firing takes the lock at commit and
-    // the transaction's earlier statements run without it. SET CONSTRAINTS
-    // IMMEDIATE fires it per statement instead, holding the lock from there.
-    let (floor, limit, floor_rows) = Spi::connect_mut(|client| {
-        client
-            .update(
-                head_plan()?,
-                Some(1),
-                &[
-                    oid.into(),
-                    config.epoch.into(),
-                    trigger.trigger().tgoid.into(),
-                ],
-            )?
-            .first()
-            .get_three::<i64, i64, i64>()
-    })?;
-    let (Some(floor), Some(limit), Some(floor_rows)) = (floor, limit, floor_rows) else {
-        full()
-    };
-    // A latest snapshot sees every mark committed before this lock was granted,
-    // including under repeatable read, and this transaction's own earlier marks.
-    let (emitted, live) = {
-        let _latest = Snapshot::latest();
-        // SAFETY: the guard above pins this MVCC snapshot through the scan.
-        let snapshot = unsafe { pg_sys::GetActiveSnapshot() };
-        position(&source, snapshot, config.epoch, floor, floor_rows).unwrap_or_else(|| stale())
-    };
-    let live = live + row_delta;
-    if emitted > limit - i64::from(count)
-        || emitted > i64::MAX - i64::from(count)
-        || !(0..=1_000_000).contains(&live)
-    {
-        full();
-    }
+    let commands = vec![command; changes.len()];
     let inserted = Spi::connect_mut(|client| {
         client
             .update(
@@ -965,15 +985,15 @@ fn syntra_capture_row<'a>(
                     old.into(),
                     after.into(),
                     new.into(),
-                    command.into(),
-                    i64::from(count).into(),
+                    commands.into(),
+                    count.into(),
                     live.into(),
                 ],
             )?
             .first()
             .get_one::<i64>()
     })?;
-    if inserted != Some(i64::from(count)) {
+    if inserted != Some(count) {
         full();
     }
     Ok(None)
