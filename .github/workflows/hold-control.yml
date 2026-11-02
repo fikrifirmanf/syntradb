@@ -73,7 +73,7 @@ defaults:
     shell: bash
 
 concurrency:
-  group: hold-control-${{ github.ref }}
+  group: hold-control-${{ github.ref }}-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
