@@ -152,6 +152,9 @@ jobs:
                   c, p = d['captured'], d['plain']
                   print(r, p[1], c[1], c[0], c[2], c[3], c[4])
           PY
+      - name: Relative verdict (issue 10)
+        if: always() && inputs.explain_targets == ''
+        run: bash benchmarks/scripts/hold-verdict.sh benchmarks/results/actions/hold-control.log | tee benchmarks/results/actions/verdict.txt
       - name: Save logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
