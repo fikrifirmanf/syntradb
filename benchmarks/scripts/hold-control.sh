@@ -20,6 +20,10 @@ CLIENTS="${CLIENTS:-2}"
 # PROFILE_ROUNDS (space-separated round numbers) with PERF_BIN records user CPU
 # samples of the pgbench backends in those rounds and writes self-time reports to
 # $WORK/profile-<round>-<table>.txt. Needs sudo for perf. Adds overhead.
+# MAINT_INTERVAL_MS is the maintenance worker's interval (default 200). Each cycle
+# that prunes updates the single head row, and a held snapshot keeps every version,
+# so a longer interval tests whether that version chain causes the latency cliff.
+MAINT_INTERVAL_MS="${MAINT_INTERVAL_MS:-200}"
 PROFILE_ROUNDS="${PROFILE_ROUNDS:-}"
 PERF_BIN="${PERF_BIN:-}"
 case "$SHAPE" in transfer | cycle) ;; *) echo "shape must be transfer or cycle" >&2; exit 2 ;; esac
@@ -37,8 +41,8 @@ BIN="$WORK/pg/bin"
 SOCKET="$(mktemp -d /tmp/syntra-hold.XXXXXX)"
 PORT=28961
 "$BIN/initdb" -D "$WORK/data" --username=hold --auth=trust --no-locale --encoding=UTF8 >/dev/null
-printf "\nlisten_addresses = ''\nunix_socket_directories = '%s'\nport = %s\nshared_preload_libraries = 'syntradb'\nsyntradb.maintenance_database = 'feeds'\nsyntradb.maintenance_interval_ms = 200\n" \
-    "$SOCKET" "$PORT" >>"$WORK/data/postgresql.conf"
+printf "\nlisten_addresses = ''\nunix_socket_directories = '%s'\nport = %s\nshared_preload_libraries = 'syntradb'\nsyntradb.maintenance_database = 'feeds'\nsyntradb.maintenance_interval_ms = %s\n" \
+    "$SOCKET" "$PORT" "$MAINT_INTERVAL_MS" >>"$WORK/data/postgresql.conf"
 HOLDER=""
 cleanup() {
     if [[ -n "$HOLDER" ]]; then kill "$HOLDER" 2>/dev/null || true; fi
@@ -115,6 +119,9 @@ for round in $(seq 1 "$ROUNDS"); do
             q "SELECT 'diag-table $round $t '||relname||' dead='||n_dead_tup||' live='||n_live_tup||' upd='||n_tup_upd||' hot='||n_tup_hot_upd||' seq_read='||seq_tup_read||' idx_fetch='||coalesce(idx_tup_fetch,0)||' bytes='||pg_total_relation_size(relid) FROM pg_stat_user_tables WHERE relname IN ('$t') OR schemaname='syntra' ORDER BY relname"
         fi
         dead="$(q "SELECT n_dead_tup FROM pg_stat_user_tables WHERE relname='$t'")"
+        if [[ "$t" == captured ]]; then
+            echo "head-stats $round $(q "SELECT 'upd='||n_tup_upd||' hot='||n_tup_hot_upd||' bytes='||pg_relation_size(relid) FROM pg_stat_user_tables WHERE relname='capture_heads' AND schemaname='syntra'")"
+        fi
         echo "$round $t $tps $dead $(q "SELECT syntra_cleanup_horizon_age()")"
     done
 done

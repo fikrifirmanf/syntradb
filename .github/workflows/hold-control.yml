@@ -37,6 +37,14 @@ on:
           - '2'
           - '1'
         default: '2'
+      maintenance_interval_ms:
+        description: Maintenance worker interval; a longer one prunes less often and updates the head row less
+        type: choice
+        options:
+          - '200'
+          - '1000'
+          - '5000'
+        default: '200'
       profile_rounds:
         description: Space-separated rounds to CPU-profile with perf (empty for none); adds overhead
         type: string
@@ -78,6 +86,7 @@ jobs:
       RATE: ${{ inputs.rate }}
       SHAPE: ${{ inputs.shape }}
       CLIENTS: ${{ inputs.clients }}
+      MAINT_INTERVAL_MS: ${{ inputs.maintenance_interval_ms }}
       PROFILE_ROUNDS: ${{ inputs.profile_rounds }}
       EXPLAIN_TARGETS: ${{ inputs.explain_targets }}
       DIAG: ${{ inputs.diag && '1' || '0' }}
