@@ -17,6 +17,11 @@ DIAG="${DIAG:-0}"
 # CLIENTS is the number of pgbench clients per run (default 2). One client removes
 # writer-against-writer lock queueing from the comparison.
 CLIENTS="${CLIENTS:-2}"
+# SPLIT=1 (needs CLIENTS=2) gives each client its own table: plain/plain2 and
+# captured/captured2, so the two captured writers never share a head row. Total
+# offered load is unchanged (RATE is split in half). Reported tps is the sum and
+# latency the mean of the two.
+SPLIT="${SPLIT:-0}"
 # PROFILE_ROUNDS (space-separated round numbers) with PERF_BIN records user CPU
 # samples of the pgbench backends in those rounds and writes self-time reports to
 # $WORK/profile-<round>-<table>.txt. Needs sudo for perf. Adds overhead.
@@ -53,11 +58,12 @@ trap cleanup EXIT
 q() { "$BIN/psql" -h "$SOCKET" -p "$PORT" -U hold -d feeds -v ON_ERROR_STOP=1 -AtqX -c "$1"; }
 "$BIN/createdb" -h "$SOCKET" -p "$PORT" -U hold feeds
 q "CREATE EXTENSION syntradb"
-for t in plain captured; do
+for t in plain captured $([[ "$SPLIT" == 1 ]] && echo "plain2 captured2"); do
     q "CREATE TABLE $t(id int4 PRIMARY KEY, v int4); INSERT INTO $t SELECT g, 1000 FROM generate_series(1,10000) AS g; ALTER TABLE $t SET (autovacuum_enabled = true)"
 done
 q "SELECT syntra_seed_capture('captured','id','v',4096)"
-for t in plain captured; do
+if [[ "$SPLIT" == 1 ]]; then q "SELECT syntra_seed_capture('captured2','id','v',4096)"; fi
+for t in plain captured $([[ "$SPLIT" == 1 ]] && echo "plain2 captured2"); do
     cat >"$WORK/$t.sql" <<EOF
 \set a random(1, 10000)
 \set b random(1, 10000)
@@ -106,8 +112,18 @@ for round in $(seq 1 "$ROUNDS"); do
             ) &
             PROFILER=$!
         fi
+        if [[ "$SPLIT" == 1 ]]; then
+            half=$((RATE / 2))
+            "$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c 1 -j 1 -R "$half" -T "$SECONDS_PER_ROUND" -f "$WORK/$t.sql" feeds >"$WORK/split.a" 2>&1 &
+            pa=$!
+            "$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c 1 -j 1 -R "$half" -T "$SECONDS_PER_ROUND" -f "$WORK/${t}2.sql" feeds >"$WORK/split.b" 2>&1 &
+            pb=$!
+            wait "$pa" "$pb"
+            tps="$(cat "$WORK/split.a" "$WORK/split.b" | awk '/^tps = /{tps+=$3} /^latency average/{lat+=$4; n++} /^number of failed/{fail+=$5} END{print tps, lat/n, fail}')"
+        else
         tps="$("$BIN/pgbench" -h "$SOCKET" -p "$PORT" -U hold -n -c "$CLIENTS" -j "$CLIENTS" -R "$RATE" -T "$SECONDS_PER_ROUND" -f "$WORK/$t.sql" feeds 2>&1 \
             | awk '/^tps = /{tps=$3} /^latency average/{lat=$4} /^number of failed/{fail=$5} END{print tps, lat, fail}')"
+        fi
         if [[ -n "$PROFILER" ]]; then
             wait "$PROFILER" || true
             cp "$WORK/profile-$round-$t.txt" "$SYNTRA_ROOT/benchmarks/results/actions/" 2>/dev/null || true
@@ -126,5 +142,9 @@ for round in $(seq 1 "$ROUNDS"); do
     done
 done
 q "SELECT 'pending '||pending_events FROM syntra_capture_lag('captured')"
-q "SELECT 'sums '||(SELECT sum(v) FROM plain)||' '||(SELECT sum(v) FROM captured)"
+if [[ "$SPLIT" == 1 ]]; then
+    q "SELECT 'sums '||(SELECT sum(v) FROM plain)+(SELECT sum(v) FROM plain2)||' '||(SELECT sum(v) FROM captured)+(SELECT sum(v) FROM captured2)"
+else
+    q "SELECT 'sums '||(SELECT sum(v) FROM plain)||' '||(SELECT sum(v) FROM captured)"
+fi
 echo "work dir $WORK"

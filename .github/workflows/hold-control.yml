@@ -45,6 +45,10 @@ on:
           - '1000'
           - '5000'
         default: '200'
+      split:
+        description: Give each of the 2 clients its own captured table (own head row); needs clients=2
+        type: boolean
+        default: false
       profile_rounds:
         description: Space-separated rounds to CPU-profile with perf (empty for none); adds overhead
         type: string
@@ -86,6 +90,7 @@ jobs:
       RATE: ${{ inputs.rate }}
       SHAPE: ${{ inputs.shape }}
       CLIENTS: ${{ inputs.clients }}
+      SPLIT: ${{ inputs.split && '1' || '0' }}
       MAINT_INTERVAL_MS: ${{ inputs.maintenance_interval_ms }}
       PROFILE_ROUNDS: ${{ inputs.profile_rounds }}
       EXPLAIN_TARGETS: ${{ inputs.explain_targets }}
