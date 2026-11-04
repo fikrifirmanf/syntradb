@@ -121,7 +121,30 @@ answers whether the lock is the cause and how much of the gap B could close:
 - Upgrade, downgrade and crash recovery checks pass; the native-relative gate from
   issue #10 passes on the hold control.
 
-## Decision needed
+## Experiment result (split tables)
 
-Whether to run the throwaway experiment (cheap, discards its code) before choosing
-between A and B. Nothing here changes the current claim: the Load gate stays open.
+The throwaway experiment ran in a different form than step 1. A sequence-ordinal
+hack would break the applier's gap checks and make the drain unreliable, so the
+branch `exp/head-chain-hypothesis` (c7fb364) gives each of the 2 clients its own
+captured table and head row at the same total load. That removes writer-on-writer
+queueing on the head row, which is what B would remove. Three runs, 20 rounds at
+200 tps, 200 ms maintenance:
+
+| Run | Worst latency vs plain | Rounds over 2x | Worst throughput ratio | Correctness |
+|---|---|---|---|---|
+| 41667564573 | 4.3x (round 7) | 2 | 0.84 | pass |
+| 41667582245 | 4.6x (round 7) | 1 | 0.84 | pass |
+| 41667599148 | 3.9x (round 8) | 1 | 0.84 | pass |
+
+The latency check fails in all three, in the same 3.8x to 7.1x range as the five
+single-table 200 ms runs. Step 3 applies: the head-row lock is not the main cause
+of the gap, and B would not close it. Writers did queue on that lock (issue #11),
+but removing the queue is not enough. Caveat: three runs, and the cliff position
+moves with runner noise.
+
+## Decision
+
+Choose **A**: accept and document the limit, and keep the Load gate open with this
+explanation. Do not write B's format change on this evidence. If the remaining
+cause is pursued, profile the batched insert path first (`hold-explain.sh` still
+mirrors the per-firing SQL, not the batched insert).
