@@ -83,6 +83,15 @@ and every lookup of that row walked them all. Readers reject an event past the
 newest mark as a history gap, so losing the newest mark is detected as losing the
 newest event was before.
 
+Known limitation: writers to one captured table queue on the head row's lock, and
+the queueing grows with horizon age because the head row's version chain
+lengthens while a snapshot is held. In a held-snapshot control, two clients on one
+table showed `Lock:transactionid` and `Lock:tuple` waits. Giving each client its
+own table did not remove the slowdown against plain PostgreSQL, so the lock is not
+the only cause. A different ordinal scheme was considered and not adopted; see
+[capture ordinal design](capture-ordinal-design.md) and the
+[split-table results](../benchmarks/hold-control-split-linux-2026-11-03.md).
+
 Each row callback checks current registration, storage identity, trigger definitions
 and global DDL guards. It pins a latest metadata snapshot even when the writer has
 an older repeatable-read snapshot. A stale epoch or guard configuration rejects

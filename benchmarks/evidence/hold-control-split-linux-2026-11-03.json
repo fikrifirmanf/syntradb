@@ -1,0 +1,585 @@
+{
+ "version": "0.12.0 plus kept SPI plans and commit-time batching, experiment branch exp/head-chain-hypothesis (c7fb364)",
+ "script": "benchmarks/scripts/hold-control.sh 20 30 200 cycle",
+ "env": {
+  "CLIENTS": 2,
+  "SPLIT": 1,
+  "MAINT_INTERVAL_MS": 200
+ },
+ "note": "SPLIT=1 gives each client its own captured table and head row. Plain table is the matched native control.",
+ "runs": [
+  {
+   "run": "https://github.com/fikrifirmanf/syntradb/actions/runs/41667564573",
+   "verdict": [
+    "relative-verdict correctness PASS (failed rounds 0, sums equal)",
+    "relative-verdict throughput PASS (worst captured/plain 0.84 at round 17; 0 rounds under the floor)",
+    "relative-verdict latency FAIL (worst captured/plain 4.3x at round 7; 2 rounds over 2x)",
+    "relative-verdict FAIL"
+   ],
+   "rows": [
+    {
+     "round": 1,
+     "plain_latency_ms": 1.557,
+     "captured_latency_ms": 2.139,
+     "captured_tps": 196.409,
+     "captured_failed": 0,
+     "dead_tuples": 11784,
+     "horizon_age": 12964
+    },
+    {
+     "round": 2,
+     "plain_latency_ms": 3.582,
+     "captured_latency_ms": 4.5085,
+     "captured_tps": 201.904,
+     "captured_failed": 0,
+     "dead_tuples": 24144,
+     "horizon_age": 26310
+    },
+    {
+     "round": 3,
+     "plain_latency_ms": 6.1765,
+     "captured_latency_ms": 7.814,
+     "captured_tps": 204.149,
+     "captured_failed": 0,
+     "dead_tuples": 36544,
+     "horizon_age": 39654
+    },
+    {
+     "round": 4,
+     "plain_latency_ms": 9.6415,
+     "captured_latency_ms": 13.707,
+     "captured_tps": 202.17,
+     "captured_failed": 0,
+     "dead_tuples": 48516,
+     "horizon_age": 52837
+    },
+    {
+     "round": 5,
+     "plain_latency_ms": 15.894,
+     "captured_latency_ms": 26.5905,
+     "captured_tps": 197.189,
+     "captured_failed": 0,
+     "dead_tuples": 60276,
+     "horizon_age": 65949
+    },
+    {
+     "round": 6,
+     "plain_latency_ms": 29.706,
+     "captured_latency_ms": 82.6725,
+     "captured_tps": 196.1,
+     "captured_failed": 0,
+     "dead_tuples": 72096,
+     "horizon_age": 78879
+    },
+    {
+     "round": 7,
+     "plain_latency_ms": 245.008,
+     "captured_latency_ms": 1053.07,
+     "captured_tps": 176.031,
+     "captured_failed": 0,
+     "dead_tuples": 82672,
+     "horizon_age": 91064
+    },
+    {
+     "round": 8,
+     "plain_latency_ms": 1196.83,
+     "captured_latency_ms": 2808.67,
+     "captured_tps": 158.342,
+     "captured_failed": 0,
+     "dead_tuples": 92132,
+     "horizon_age": 102230
+    },
+    {
+     "round": 9,
+     "plain_latency_ms": 2379.18,
+     "captured_latency_ms": 4067.75,
+     "captured_tps": 141.493,
+     "captured_failed": 0,
+     "dead_tuples": 100520,
+     "horizon_age": 112345
+    },
+    {
+     "round": 10,
+     "plain_latency_ms": 3743.56,
+     "captured_latency_ms": 4902.06,
+     "captured_tps": 129.905,
+     "captured_failed": 0,
+     "dead_tuples": 108276,
+     "horizon_age": 121671
+    },
+    {
+     "round": 11,
+     "plain_latency_ms": 4253.21,
+     "captured_latency_ms": 5802.75,
+     "captured_tps": 122.982,
+     "captured_failed": 0,
+     "dead_tuples": 115556,
+     "horizon_age": 130496
+    },
+    {
+     "round": 12,
+     "plain_latency_ms": 5175.73,
+     "captured_latency_ms": 6452.11,
+     "captured_tps": 114.417,
+     "captured_failed": 0,
+     "dead_tuples": 122324,
+     "horizon_age": 138731
+    },
+    {
+     "round": 13,
+     "plain_latency_ms": 5591.02,
+     "captured_latency_ms": 6314.74,
+     "captured_tps": 110.389,
+     "captured_failed": 0,
+     "dead_tuples": 128900,
+     "horizon_age": 146677
+    },
+    {
+     "round": 14,
+     "plain_latency_ms": 6006.57,
+     "captured_latency_ms": 7177.51,
+     "captured_tps": 104.642,
+     "captured_failed": 0,
+     "dead_tuples": 135100,
+     "horizon_age": 154319
+    },
+    {
+     "round": 15,
+     "plain_latency_ms": 6558.43,
+     "captured_latency_ms": 7704.4,
+     "captured_tps": 96.6406,
+     "captured_failed": 0,
+     "dead_tuples": 140892,
+     "horizon_age": 161534
+    },
+    {
+     "round": 16,
+     "plain_latency_ms": 6783.12,
+     "captured_latency_ms": 8294.49,
+     "captured_tps": 89.9259,
+     "captured_failed": 0,
+     "dead_tuples": 146240,
+     "horizon_age": 168344
+    },
+    {
+     "round": 17,
+     "plain_latency_ms": 7313.27,
+     "captured_latency_ms": 8574.95,
+     "captured_tps": 86.4167,
+     "captured_failed": 0,
+     "dead_tuples": 151372,
+     "horizon_age": 174916
+    },
+    {
+     "round": 18,
+     "plain_latency_ms": 7291.23,
+     "captured_latency_ms": 8793.73,
+     "captured_tps": 84.1847,
+     "captured_failed": 0,
+     "dead_tuples": 156356,
+     "horizon_age": 181330
+    },
+    {
+     "round": 19,
+     "plain_latency_ms": 7931.13,
+     "captured_latency_ms": 8783.71,
+     "captured_tps": 83.2226,
+     "captured_failed": 0,
+     "dead_tuples": 161300,
+     "horizon_age": 187654
+    },
+    {
+     "round": 20,
+     "plain_latency_ms": 7919.47,
+     "captured_latency_ms": 8701.68,
+     "captured_tps": 83.6157,
+     "captured_failed": 0,
+     "dead_tuples": 166296,
+     "horizon_age": 193944
+    }
+   ]
+  },
+  {
+   "run": "https://github.com/fikrifirmanf/syntradb/actions/runs/41667582245",
+   "verdict": [
+    "relative-verdict correctness PASS (failed rounds 0, sums equal)",
+    "relative-verdict throughput PASS (worst captured/plain 0.84 at round 16; 0 rounds under the floor)",
+    "relative-verdict latency FAIL (worst captured/plain 4.6x at round 7; 1 rounds over 2x)",
+    "relative-verdict FAIL"
+   ],
+   "rows": [
+    {
+     "round": 1,
+     "plain_latency_ms": 1.8325,
+     "captured_latency_ms": 2.406,
+     "captured_tps": 195.288,
+     "captured_failed": 0,
+     "dead_tuples": 11584,
+     "horizon_age": 12916
+    },
+    {
+     "round": 2,
+     "plain_latency_ms": 4.152,
+     "captured_latency_ms": 4.9855,
+     "captured_tps": 200.199,
+     "captured_failed": 0,
+     "dead_tuples": 23708,
+     "horizon_age": 26218
+    },
+    {
+     "round": 3,
+     "plain_latency_ms": 6.806,
+     "captured_latency_ms": 8.992,
+     "captured_tps": 199.858,
+     "captured_failed": 0,
+     "dead_tuples": 35968,
+     "horizon_age": 39298
+    },
+    {
+     "round": 4,
+     "plain_latency_ms": 11.5225,
+     "captured_latency_ms": 16.108,
+     "captured_tps": 203.382,
+     "captured_failed": 0,
+     "dead_tuples": 48660,
+     "horizon_age": 52580
+    },
+    {
+     "round": 5,
+     "plain_latency_ms": 20.1945,
+     "captured_latency_ms": 39.22,
+     "captured_tps": 196.327,
+     "captured_failed": 0,
+     "dead_tuples": 60356,
+     "horizon_age": 65503
+    },
+    {
+     "round": 6,
+     "plain_latency_ms": 71.3015,
+     "captured_latency_ms": 395.011,
+     "captured_tps": 189.462,
+     "captured_failed": 0,
+     "dead_tuples": 71660,
+     "horizon_age": 78363
+    },
+    {
+     "round": 7,
+     "plain_latency_ms": 497.277,
+     "captured_latency_ms": 2293.33,
+     "captured_tps": 167.302,
+     "captured_failed": 0,
+     "dead_tuples": 81608,
+     "horizon_age": 90123
+    },
+    {
+     "round": 8,
+     "plain_latency_ms": 1782.35,
+     "captured_latency_ms": 3261.27,
+     "captured_tps": 150.571,
+     "captured_failed": 0,
+     "dead_tuples": 90508,
+     "horizon_age": 100742
+    },
+    {
+     "round": 9,
+     "plain_latency_ms": 3066.72,
+     "captured_latency_ms": 4599.7,
+     "captured_tps": 136.183,
+     "captured_failed": 0,
+     "dead_tuples": 98624,
+     "horizon_age": 110459
+    },
+    {
+     "round": 10,
+     "plain_latency_ms": 4496.58,
+     "captured_latency_ms": 5346.6,
+     "captured_tps": 126.34,
+     "captured_failed": 0,
+     "dead_tuples": 106136,
+     "horizon_age": 119518
+    },
+    {
+     "round": 11,
+     "plain_latency_ms": 5097.0,
+     "captured_latency_ms": 5876.6,
+     "captured_tps": 116.89,
+     "captured_failed": 0,
+     "dead_tuples": 113136,
+     "horizon_age": 128009
+    },
+    {
+     "round": 12,
+     "plain_latency_ms": 5390.09,
+     "captured_latency_ms": 6598.62,
+     "captured_tps": 110.864,
+     "captured_failed": 0,
+     "dead_tuples": 119728,
+     "horizon_age": 136085
+    },
+    {
+     "round": 13,
+     "plain_latency_ms": 6049.39,
+     "captured_latency_ms": 7066.6,
+     "captured_tps": 105.798,
+     "captured_failed": 0,
+     "dead_tuples": 126028,
+     "horizon_age": 143799
+    },
+    {
+     "round": 14,
+     "plain_latency_ms": 6558.7,
+     "captured_latency_ms": 7313.22,
+     "captured_tps": 100.702,
+     "captured_failed": 0,
+     "dead_tuples": 132132,
+     "horizon_age": 151184
+    },
+    {
+     "round": 15,
+     "plain_latency_ms": 6904.88,
+     "captured_latency_ms": 7620.36,
+     "captured_tps": 94.0899,
+     "captured_failed": 0,
+     "dead_tuples": 137736,
+     "horizon_age": 158189
+    },
+    {
+     "round": 16,
+     "plain_latency_ms": 7088.44,
+     "captured_latency_ms": 8321.04,
+     "captured_tps": 86.8564,
+     "captured_failed": 0,
+     "dead_tuples": 142920,
+     "horizon_age": 164811
+    },
+    {
+     "round": 17,
+     "plain_latency_ms": 7499.16,
+     "captured_latency_ms": 8633.53,
+     "captured_tps": 85.1068,
+     "captured_failed": 0,
+     "dead_tuples": 147988,
+     "horizon_age": 171265
+    },
+    {
+     "round": 18,
+     "plain_latency_ms": 7729.31,
+     "captured_latency_ms": 8724.76,
+     "captured_tps": 82.4093,
+     "captured_failed": 0,
+     "dead_tuples": 152888,
+     "horizon_age": 177552
+    },
+    {
+     "round": 19,
+     "plain_latency_ms": 8311.86,
+     "captured_latency_ms": 8875.08,
+     "captured_tps": 80.6704,
+     "captured_failed": 0,
+     "dead_tuples": 157692,
+     "horizon_age": 183691
+    },
+    {
+     "round": 20,
+     "plain_latency_ms": 8261.12,
+     "captured_latency_ms": 8859.67,
+     "captured_tps": 80.8768,
+     "captured_failed": 0,
+     "dead_tuples": 162528,
+     "horizon_age": 189806
+    }
+   ]
+  },
+  {
+   "run": "https://github.com/fikrifirmanf/syntradb/actions/runs/41667599148",
+   "verdict": [
+    "relative-verdict correctness PASS (failed rounds 0, sums equal)",
+    "relative-verdict throughput PASS (worst captured/plain 0.84 at round 15; 0 rounds under the floor)",
+    "relative-verdict latency FAIL (worst captured/plain 3.9x at round 8; 1 rounds over 2x)",
+    "relative-verdict FAIL"
+   ],
+   "rows": [
+    {
+     "round": 1,
+     "plain_latency_ms": 2.058,
+     "captured_latency_ms": 2.4515,
+     "captured_tps": 200.602,
+     "captured_failed": 0,
+     "dead_tuples": 11948,
+     "horizon_age": 13203
+    },
+    {
+     "round": 2,
+     "plain_latency_ms": 3.366,
+     "captured_latency_ms": 4.9605,
+     "captured_tps": 202.797,
+     "captured_failed": 0,
+     "dead_tuples": 23900,
+     "horizon_age": 26565
+    },
+    {
+     "round": 3,
+     "plain_latency_ms": 5.7145,
+     "captured_latency_ms": 7.923,
+     "captured_tps": 205.422,
+     "captured_failed": 0,
+     "dead_tuples": 35956,
+     "horizon_age": 39927
+    },
+    {
+     "round": 4,
+     "plain_latency_ms": 8.9915,
+     "captured_latency_ms": 12.2715,
+     "captured_tps": 198.451,
+     "captured_failed": 0,
+     "dead_tuples": 47944,
+     "horizon_age": 53112
+    },
+    {
+     "round": 5,
+     "plain_latency_ms": 14.3505,
+     "captured_latency_ms": 24.7845,
+     "captured_tps": 200.913,
+     "captured_failed": 0,
+     "dead_tuples": 60116,
+     "horizon_age": 66300
+    },
+    {
+     "round": 6,
+     "plain_latency_ms": 23.0535,
+     "captured_latency_ms": 61.2175,
+     "captured_tps": 194.981,
+     "captured_failed": 0,
+     "dead_tuples": 71672,
+     "horizon_age": 79182
+    },
+    {
+     "round": 7,
+     "plain_latency_ms": 54.551,
+     "captured_latency_ms": 943.448,
+     "captured_tps": 186.713,
+     "captured_failed": 0,
+     "dead_tuples": 82920,
+     "horizon_age": 91752
+    },
+    {
+     "round": 8,
+     "plain_latency_ms": 637.362,
+     "captured_latency_ms": 2475.37,
+     "captured_tps": 167.508,
+     "captured_failed": 0,
+     "dead_tuples": 93052,
+     "horizon_age": 103516
+    },
+    {
+     "round": 9,
+     "plain_latency_ms": 1759.08,
+     "captured_latency_ms": 3487.26,
+     "captured_tps": 149.854,
+     "captured_failed": 0,
+     "dead_tuples": 102028,
+     "horizon_age": 114186
+    },
+    {
+     "round": 10,
+     "plain_latency_ms": 2838.7,
+     "captured_latency_ms": 4576.53,
+     "captured_tps": 140.677,
+     "captured_failed": 0,
+     "dead_tuples": 110504,
+     "horizon_age": 124163
+    },
+    {
+     "round": 11,
+     "plain_latency_ms": 4022.7,
+     "captured_latency_ms": 5344.23,
+     "captured_tps": 130.583,
+     "captured_failed": 0,
+     "dead_tuples": 118388,
+     "horizon_age": 133480
+    },
+    {
+     "round": 12,
+     "plain_latency_ms": 4803.08,
+     "captured_latency_ms": 5854.06,
+     "captured_tps": 121.547,
+     "captured_failed": 0,
+     "dead_tuples": 125628,
+     "horizon_age": 142199
+    },
+    {
+     "round": 13,
+     "plain_latency_ms": 5099.51,
+     "captured_latency_ms": 6384.48,
+     "captured_tps": 117.19,
+     "captured_failed": 0,
+     "dead_tuples": 132744,
+     "horizon_age": 150617
+    },
+    {
+     "round": 14,
+     "plain_latency_ms": 5437.98,
+     "captured_latency_ms": 6479.19,
+     "captured_tps": 108.438,
+     "captured_failed": 0,
+     "dead_tuples": 139176,
+     "horizon_age": 158559
+    },
+    {
+     "round": 15,
+     "plain_latency_ms": 5876.55,
+     "captured_latency_ms": 7225.42,
+     "captured_tps": 100.052,
+     "captured_failed": 0,
+     "dead_tuples": 145132,
+     "horizon_age": 166077
+    },
+    {
+     "round": 16,
+     "plain_latency_ms": 6426.35,
+     "captured_latency_ms": 7724.72,
+     "captured_tps": 97.7326,
+     "captured_failed": 0,
+     "dead_tuples": 150940,
+     "horizon_age": 173386
+    },
+    {
+     "round": 17,
+     "plain_latency_ms": 6722.84,
+     "captured_latency_ms": 8364.06,
+     "captured_tps": 90.4832,
+     "captured_failed": 0,
+     "dead_tuples": 156372,
+     "horizon_age": 180215
+    },
+    {
+     "round": 18,
+     "plain_latency_ms": 7023.59,
+     "captured_latency_ms": 8138.02,
+     "captured_tps": 89.4307,
+     "captured_failed": 0,
+     "dead_tuples": 161684,
+     "horizon_age": 186962
+    },
+    {
+     "round": 19,
+     "plain_latency_ms": 7358.76,
+     "captured_latency_ms": 8205.83,
+     "captured_tps": 87.5886,
+     "captured_failed": 0,
+     "dead_tuples": 166924,
+     "horizon_age": 193576
+    },
+    {
+     "round": 20,
+     "plain_latency_ms": 7800.34,
+     "captured_latency_ms": 8465.72,
+     "captured_tps": 86.9915,
+     "captured_failed": 0,
+     "dead_tuples": 172140,
+     "horizon_age": 200115
+    }
+   ]
+  }
+ ]
+}
