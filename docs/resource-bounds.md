@@ -263,6 +263,6 @@ statement-tracking counter rows from captured writes, the largest cost found in
 isolation ([findings](../benchmarks/held-snapshot-writers-2026-10-29.md)), but
 the same soak on 0.5.0 still slowed from about the same age
 ([0.5.0 run](checkpoint-soak.md#two-hour-hold-on-050-int4-2026-10-29)). A
-snapshot left open long enough still stops writers in practice. Storage still grows while
+snapshot left open long enough still stops writers in practice. Concurrent writers to one captured table also queue on its head row, and the queueing grows with horizon age; keep the number of concurrent writers per source low and watch `syntra_capture_lag(source)` ([split-table control](../benchmarks/hold-control-split-linux-2026-11-03.md)). Storage still grows while
 a snapshot is held, and these are one laptop's numbers, so keep the policy. Raise the thresholds only after a
 held-snapshot soak passes on the pilot's hardware.
